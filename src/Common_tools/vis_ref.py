@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import sys
 from scipy.ndimage import gaussian_filter
 import numpy as np
+import networkx as nx
 print(sys.path)
 
 ###Définition des couleurs
@@ -31,7 +32,7 @@ def smooth_ln_1d(X, Z, limits_x, reso, factor=4, smooth_param_x=1.0):
         range=np.log(limits_x)
     )
     H_smooth = gaussian_filter(H, sigma=smooth_param_x/((xedges[-1]-xedges[0])/len(xedges)))
-    H_small = H_smooth.reshape(H_smooth.shape[0] // factor, factor).mean(axis=1)
+    H_small = H_smooth.reshape(H_smooth.shape[0] // factor, factor).sum(axis=1)
     return H_small
 
 ## Lissage 2D
@@ -42,7 +43,7 @@ def smooth_ln_2d(X, Y, Z, limits_x, limits_y, reso, smooth_param_x, smooth_param
     yi = 0.5 * (yedges[1:] + yedges[:-1])
     xi_small = xi.reshape(-1, factor).mean(axis=1)
     yi_small = yi.reshape(-1, factor).mean(axis=1)
-    Z_small = Z.reshape(Z.shape[0]//factor, factor, Z.shape[1]//factor, factor).mean(axis=(1,3))
+    Z_small = Z.reshape(Z.shape[0]//factor, factor, Z.shape[1]//factor, factor).sum(axis=(1,3))
     return(Z_small, xi_small, yi_small)
 
 ## Quantile matrix
@@ -94,3 +95,35 @@ def log_125_formatter(val, pos=None):
         return rf"${mantissa:g}.10^{{{int(exponent)}}}$"
     else:
         return ""
+
+def color_lists(lists):
+    """
+    lists : liste de p listes, chaque sous-liste ayant n éléments distincts.
+    Retourne : dict {élément: couleur} si trouvé, sinon None
+    """
+    # Construire le graphe d'intersection
+    G = nx.Graph()
+    for L in lists:
+        for u in L:
+            G.add_node(u)
+        # Ajouter toutes les arêtes d'une clique
+        for i in range(len(L)):
+            for j in range(i+1, len(L)):
+                G.add_edge(L[i], L[j])
+
+    try:
+        # Coloration gloutonne (heuristique)
+        coloring = nx.coloring.greedy_color(G, strategy="largest_first")
+    except Exception as e:
+        print("Échec du coloriage heuristique :", e)
+        return None
+
+    # Vérification : chaque liste doit avoir toutes ses couleurs distinctes
+    for L in lists:
+        couleurs = [coloring[x] for x in L]
+        # print(len(set(couleurs)))
+        if len(set(couleurs)) < len(couleurs):
+            print("Coloriage invalide pour au moins une liste.")
+            return None
+
+    return coloring

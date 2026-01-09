@@ -70,6 +70,9 @@ mapping_engines = dict(zip(L_engines, Gen_engines))
 ### the entry dataset is composed of several columns : 'Aircraft Type','Engine', 'Delivery Date', 'Status', 'Event Date'
 ### Status vaut written off, stored ou active
 ### Each column describes an engine which is or was part of the fleet
+# The following module contains :
+# 1) A function to vizualize the fleet composition
+# 2) Functions to vizualize the aircraft deliveries and retirements
 def visu_fleet(df, mapping = mapping_engines):
     df = df.copy()
     df['gen'] = df['Engine'].map(mapping)
@@ -126,7 +129,6 @@ def visu_prod(df, mapping = mapping_engines, reso = 1):
     df['gen'] = df['Engine'].map(mapping)
 
     deliveries = df[['gen', 'Delivery Date']].copy()
-    x_min = 1970
     deliveries['Delivery Date'] = ((deliveries['Delivery Date']-1970)/reso).astype(int)*reso+1970+reso/2
 
     deliveries['change'] = 1 #possibility to weight by the number of available seats, if it is in the dataset
@@ -191,16 +193,16 @@ def visu_retirements(df, mapping = mapping_engines, reso_1 = 1, reso_2 = 1):
     dates_u = np.sort(np.unique(date))#croissant
     gens_u = np.sort(np.unique(gen))[::-1]
     deliv_u = np.sort(np.unique(deliv))[::-1]   # décroissant
-    T, G, D = len(dates_u), len(gens_u), len(deliv_u)
-    M = np.zeros((T, G, D), dtype=float)
+    t, g, d = len(dates_u), len(gens_u), len(deliv_u)
+    m = np.zeros((t, g, d), dtype=float)
     t_idx = np.searchsorted(dates_u, date)
     g_idx = np.searchsorted(gens_u[::-1], gen)
     d_idx = np.searchsorted(deliv_u[::-1], deliv)
-    np.add.at(M, (t_idx, g_idx, d_idx), change)
-    M_flat = M.reshape(M.shape[0], -1)
-    M_flat = np.cumsum(M_flat[:,::-1], axis=1)
-    for i in range(M_flat.shape[1]):
-        plt.plot(dates_u, M_flat[:,i], color = 'black', linestyle='--', linewidth=0.5)
+    np.add.at(m, (t_idx, g_idx, d_idx), change)
+    m_flat = m.reshape(m.shape[0], -1)
+    m_flat = np.cumsum(m_flat[:,::-1], axis=1)
+    for i in range(m_flat.shape[1]):
+        plt.plot(dates_u, m_flat[:,i], color = 'black', linestyle='--', linewidth=0.5)
 
 
     x_max = history.index.max()
