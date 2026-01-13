@@ -1,1 +1,13 @@
 Cette section contiendra notamment des tables de conversion des noms de type, de nomenclature entre diverses bases de données, etc...
+Base de données contenues:
+- conversion avions bts et icao
+- base de donnée des aéroports
+- base de donnée flotte
+- base de donnée assignment
+- base de donnée caractéristiques techniques par appareil
+- bases de données productivité
+
+Par la suite, y sont stockés les coefficients étalonnées :
+- comportement retrait : coefficients de priorisation par type, effet de l'âge...
+- comportement assignment (coefficients par type,
+- comportement productivité (coefficients distance connection, effet de l'âge, saisonnalité...)

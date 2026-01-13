@@ -5,7 +5,6 @@ import warnings
 from src.Common_tools.vis_ref import colors_5, colors_10, vis_colors
 import numpy as np
 warnings.filterwarnings("ignore")
-# vis_colors(colors_5)
 
 Class_engines = ['AVON 527',0, 'AVON 531B',0, 'AVON 533R',0, 'BR715A1-30',2, 'BR715C1-30',2, 'CF6-45A2',0, ###mapping des types de moteurs dans la bdd
                  'CF6-50C',0, 'CF6-50C1',0, 'CF6-50C2',0, 'CF6-50C2B',0, 'CF6-50C2F',0, 'CF6-50C2R',0,
@@ -73,7 +72,7 @@ mapping_engines = dict(zip(L_engines, Gen_engines))
 # The following module contains :
 # 1) A function to vizualize the fleet composition
 # 2) Functions to vizualize the aircraft deliveries and retirements
-def visu_fleet(df, mapping = mapping_engines):
+def visu_fleet(df, mapping = mapping_engines, title = 'fleet_ex'):
     df = df.copy()
     df['gen'] = df['Engine'].map(mapping)
 
@@ -122,9 +121,10 @@ def visu_fleet(df, mapping = mapping_engines):
     plt.legend(loc='upper left', title="Generation")
     plt.grid(axis='y', linestyle='--', alpha=0.5)
     plt.tight_layout()
-    plt.show()
+    plt.savefig('figures/fleet_figures' + title + '.pdf', format='pdf')
+    plt.close()
 
-def visu_prod(df, mapping = mapping_engines, reso = 1):
+def visu_prod(df, mapping = mapping_engines, reso = 1, title = 'fleet_prod_ex'):
     df = df.copy()
     df['gen'] = df['Engine'].map(mapping)
 
@@ -160,9 +160,10 @@ def visu_prod(df, mapping = mapping_engines, reso = 1):
     plt.legend(loc='upper left', title="Générations")
     plt.grid(axis='y', linestyle='--', alpha=0.5)
     plt.tight_layout()
-    plt.show()
+    plt.savefig('figures/fleet_figures/' + title + '.pdf', format='pdf')
+    plt.close()
 
-def visu_retirements(df, mapping = mapping_engines, reso_1 = 1, reso_2 = 1):
+def visu_retirements(df, mapping = mapping_engines, reso_1 = 1, reso_2 = 1, title = 'fleet_retirements_ex'):
     df = df.copy()
     df['gen'] = df['Engine'].map(mapping)
 
@@ -217,4 +218,5 @@ def visu_retirements(df, mapping = mapping_engines, reso_1 = 1, reso_2 = 1):
     plt.legend(loc='upper left', title="Generations")
     plt.grid(axis='y', linestyle='--', alpha=0.5)
     plt.tight_layout()
-    plt.show()
+    plt.savefig('figures/fleet_figures/' + title + '.pdf', format='pdf')
+    plt.close()
