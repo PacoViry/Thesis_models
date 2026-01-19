@@ -72,6 +72,9 @@ mapping_engines = dict(zip(L_engines, Gen_engines))
 # The following module contains :
 # 1) A function to vizualize the fleet composition
 # 2) Functions to vizualize the aircraft deliveries and retirements
+# 3) Function to create a ranking of all retirements
+# 4) Function to visualize the age heterogeneity of retirements
+
 def visu_fleet(df, mapping = mapping_engines, title = 'fleet_ex'):
     df = df.copy()
     df['gen'] = df['Engine'].map(mapping)
@@ -220,3 +223,15 @@ def visu_retirements(df, mapping = mapping_engines, reso_1 = 1, reso_2 = 1, titl
     plt.tight_layout()
     plt.savefig('figures/fleet_figures/' + title + '.pdf', format='pdf')
     plt.close()
+
+def retirement_ranking(df):
+    df_a = df[df['Status'].isin(['Active', 'Stored'])]
+    df_r = df[df['Status'] == 'Written Off']
+
+    df_r = df_r.sort_values(by='Event Date')
+    df_r['rank'] = df_r['Event Date'].rank(method='min').astype(int)
+
+    df_a['rank'] = max(df_r['rank']) + 1
+    df_f = pd.concat([df_r, df_a], sort=False).reset_index(drop=True)
+    return (df_f)
+

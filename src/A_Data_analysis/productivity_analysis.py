@@ -2,11 +2,14 @@ import numpy as np
 import importlib
 import seaborn as sns
 import pandas as pd
+from fractions import Fraction
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import matplotlib.dates as mdates
+import matplotlib.cm as cm
 from matplotlib.dates import MO, TU, WE, TH, FR, SA, SU
 from matplotlib.ticker import FixedLocator
+from scipy.ndimage import gaussian_filter1d
 from src.Common_tools import vis_ref
 importlib.reload(vis_ref)
 
@@ -402,8 +405,10 @@ def visu(exemple, titre = 'ac_calendar', visu = True, x_min = None):
     ax.set_xlabel("Weeks", fontsize=18)
     if visu:
         plt.savefig('figures/productivity_figures/' + titre + '.pdf', format='pdf')
-    plt.show()
-
+        plt.close()
+    else :
+        plt.show()
+    return(None)
 
 def heures_en_vol(dep, arr, sigma_h, res_minutes):
     """Renvoie un tableau 24h comptant les minutes où l'avion est en vol."""
@@ -432,14 +437,14 @@ def heures_en_vol(dep, arr, sigma_h, res_minutes):
     heures = minutes / 60
     return pd.Series(counts_smooth, index=heures)
 
-def visu_distrib(exemple, sigma, titre, visu, visu_d):
+def visu_distrib(exemple, sigma = 0.8, titre = 'ac_fh_distrib', visu = False, visu_c = False):
     distribution = heures_en_vol(exemple['FILED OFF BLOCK TIME'], exemple['FILED ARRIVAL TIME'], sigma, res_minutes=1)
     x_min = distribution.argmin()
     y_min = distribution.min()
     if visu:
         sns.set(style='whitegrid')
         plt.figure(figsize=(9, 2.5))  # Adjusted figure size
-        if visu_d:
+        if visu_c:
             distribution2 = heures_en_vol(exemple['FILED OFF BLOCK TIME'], exemple['FILED ARRIVAL TIME'], 0.0005, res_minutes=1)
             plt.plot(distribution2.index, distribution2.values, label='raw data')
             plt.plot(distribution.index, distribution.values, label='smoothed data')
@@ -452,13 +457,14 @@ def visu_distrib(exemple, sigma, titre, visu, visu_d):
         plt.grid(True)
         plt.xlim([distribution.index.min(), distribution.index.max()])  # Set x-axis limits
         plt.ylim([0, distribution.values.max() * 1.1])  # Set y-axis limits
-        if visu_d:
-            plt.savefig('regimes/lissage_' + titre + '.pdf', bbox_inches='tight')  # bbox_inches prevents label cutoff
-        plt.show()
+        if visu_c:
+            plt.savefig('figures/productivity_figures/' + titre + '.pdf', format='pdf', bbox_inches='tight')
+            plt.close()
+        else :
+            plt.show()
     return x_min*1/60, y_min
 
-
-def constru_series_vols(exemple, h_ref):
+def constru_series_vols(exemple, x_min):
     exemple = exemple.sort_values('FILED OFF BLOCK TIME').reset_index(drop=True)
 
     # Bornes temporelles
@@ -466,7 +472,7 @@ def constru_series_vols(exemple, h_ref):
     end = exemple['FILED OFF BLOCK TIME'].max().normalize() + pd.Timedelta(days=1)
 
     # Temps de référence journaliers
-    ref_times = pd.date_range(start=start, end=end, freq='D') + pd.to_timedelta(h_ref, unit='h')
+    ref_times = pd.date_range(start=start, end=end, freq='D') + pd.to_timedelta(x_min, unit='h')
     ref_times_np = ref_times.to_numpy()
 
     # Périodes d'inactivité (avec la marge nécessaire)
@@ -474,8 +480,7 @@ def constru_series_vols(exemple, h_ref):
                                                                              'm')  ### 0mn autour de l'emplacement de l'inactivité
     start_np = exemple['FILED ARRIVAL TIME'][:-1].to_numpy() - np.timedelta64(0,
                                                                               'm')  ### 0mn autour de l'emplacement de l'inactivité
-    # start_np = exemple['FILED ARRIVAL TIME'][:-1].to_numpy()
-    # end_np = exemple['FILED OFF BLOCK TIME'][1:].to_numpy()
+
 
     cond = (ref_times_np[:, None] >= start_np[None, :]) & (ref_times_np[:, None] < end_np[None, :])
     ref_inactive = ref_times_np[np.any(cond, axis=1)]
@@ -519,7 +524,6 @@ def constru_series_vols(exemple, h_ref):
     series_duration_days = n_days[idx_start]
 
     duree_moyenne_groupe = mean_durations[idx_start]
-    serie_vol = series_id[idx_start]
     # Départs et arrivées des vols retenus
     dep_valid = dep_np[idx_valid]
     arr_valid = arr_np[idx_valid]
@@ -539,80 +543,208 @@ def constru_series_vols(exemple, h_ref):
     ))
     return tableau_vols
 
+def constru_flight_streak(df):
+    grouped_aircrafts = {u: ac for u, ac in df.groupby('Aircraft Registration')}
+    L_id = df['Aircraft Registration'].unique()
+    n_tot = len(L_id)
+    frac = n_tot//20
+    series_tot = []
 
-def streaks_matrix(x_min, x_max, x, y, sigma, reso, factor, titre, puissance_ref):
-    x = np.log(x) - sigma ** 2 / 2  # on innove :)
-    y = np.log(y) - sigma ** 2 / 2
+    for i in range(n_tot):
+        if i % frac == 0: print(str(i//frac*5)+'%,', end = " ")
+        aircraft_ref = grouped_aircrafts.get(L_id[i])
+        for t, aircraft_ex in aircraft_ref.groupby('Period'):
+            if aircraft_ex.shape[0] > 10:
+                x_min, _ = visu_distrib(aircraft_ex, sigma = 0.8, visu = False,visu_c = False)
+                series2 = constru_series_vols(aircraft_ex, x_min)
+                if series2.size > 0:
+                    series_tot.append(series2)
+    series_tot = np.concatenate(series_tot, axis=0)
+    print('100 %, ok.')
+    return series_tot
 
-    y_max = x_max
-    y_min = x_min
-    largeur_x = np.log(x_max) - np.log(x_min)
-    largeur_y = np.log(y_max) - np.log(y_min)
-    x_min_eq = x_min * np.exp(-largeur_x / 2 / (reso + 1))
-    x_max_eq = x_max * np.exp(largeur_x / 2 / (reso + 1))
-    y_min_eq = y_min * np.exp(-largeur_y / 2 / (reso + 1))
-    y_max_eq = y_max * np.exp(largeur_y / 2 / (reso + 1))
+def visu_flight_streaks(array, min_fh = 0.5, max_fh = 14, reso = 200, sigma = 0.02, title = 'regimes_all'):
+    plt.style.use('default')
+    cmap = cm.get_cmap('gist_ncar')
+    n_d = 10
+    n_v = 10
+    n_c = 10
+    hatch_l = ['..', '///', None]
+    edge_colors = ['0', 'black', 'black']
+    F = [str(0)]
+    order = [0.0]
+    types = [None]
+    largeur_x =np.log(max_fh)-np.log(min_fh)
+    min_fh_eq = min_fh * np.exp(- largeur_x / 2 / (reso - 1))  # a adapter selon le type de colormesh, on répartit avec un facteur 2 sinon
+    max_fh_eq = max_fh * np.exp(largeur_x / 2 / (reso - 1))
 
+    y_l_i = [[np.zeros(reso)]]
+    y_l_s = [[np.zeros(reso)]]
+
+    test, x_grid = vis_ref.smooth_ln_1d(np.array((min_fh_eq*max_fh_eq)**0.5), np.array(1), [min_fh_eq, max_fh_eq],reso, smooth_param_x =sigma)
+    for j in range(1, n_d + 1):
+        series_selec = array[array[:, 3] == j]
+        print(j, end = ", ")
+        for i in range(1, n_v * j + 1):
+            series_r = series_selec[series_selec[:, 1] == i]
+            if series_r.shape[0] > 0:
+                L_i = np.zeros(reso)
+                L_s = np.zeros(reso)
+                for k in range(n_c):
+                    indices = np.arange(k, series_r.shape[0], n_c)
+                    if indices.shape[0] > 0:
+                        L_i += vis_ref.smooth_ln_1d(series_r[indices, 0] * (1 - (sigma ** 2) / 2), np.ones(indices.shape[0]), [min_fh_eq, max_fh_eq],reso, smooth_param_x =sigma)[0] # 0 pour la version individuelle, 2 série
+                        L_s += vis_ref.smooth_ln_1d(series_r[indices, 2] * (1 - (sigma ** 2) / 2), np.ones(indices.shape[0]), [min_fh_eq, max_fh_eq],reso, smooth_param_x =sigma)[0]
+                y_l_i.append([L_i]) # 0 pour la version individuelle, 2 série
+                y_l_s.append([L_s])  # 0 pour la version individuelle, 2 série
+                frac = Fraction(i, j)
+                num = frac.numerator # 2
+                denom = frac.denominator # 3
+                order.append(i / j)
+                if denom == 1:
+                    F.append(str(num))
+                    if num % 2 == 0:
+                        types.append(2)
+                    else:
+                        types.append(0)
+                else:
+                    F.append(str(num) + '/' + str(denom))
+                    types.append(1)
+
+    indices = np.argsort(order)
+    order_sorted = [order[i] for i in indices]
+    y_l_i_sorted = [y_l_i[i] for i in indices]
+    y_l_s_sorted = [y_l_s[i] for i in indices]
+
+    F_sorted = [F[i] for i in indices]
+    type_sorted = [types[i] for i in indices]
+    # Fusionner les valeurs identiques
+    order_unique = []
+    y_l_i_merged = []
+    y_l_s_merged = []
+
+    F_merged = []
+    type_merged = []
+    for o, y_i, y_s, f, h in zip(order_sorted, y_l_i_sorted, y_l_s_sorted, F_sorted, type_sorted):
+        if order_unique and np.abs(o - order_unique[-1]) < 0.1:
+            y_l_i_merged[-1] += y_i[0]
+            y_l_s_merged[-1] += y_s[0]
+        else:
+            order_unique.append(o)
+            y_l_i_merged.append(y_i[0])
+            y_l_s_merged.append(y_s[0])
+            F_merged.append(f)
+            type_merged.append(h)
+    colors_sorted = [((order_unique[i] - 0.5) / (n_v)) ** 0.8 for i in range(len(order_unique))]
+
+    y_l_i_merged = np.array(y_l_i_merged)
+    y_l_i_merged = np.cumsum(y_l_i_merged, axis=0)
+    y_l_i_merged_f = 100 * y_l_i_merged / y_l_i_merged[-1, :]
+    y_l_s_merged = np.array(y_l_s_merged)
+    y_l_s_merged = np.cumsum(y_l_s_merged, axis=0)
+    y_l_s_merged_f = 100 * y_l_s_merged / y_l_s_merged[-1, :]
+
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, sharex=True, height_ratios=[3, 3, 3], figsize=(7, 8))
+
+    for i in range(len(order_unique) - 1):
+        ax2.fill_between(np.exp(x_grid), y_l_i_merged_f[i], y_l_i_merged_f[i + 1], label=F_merged[i + 1], linewidth=0.2,
+                         color=cmap(colors_sorted[i + 1]), edgecolors=edge_colors[type_merged[i + 1]],
+                         hatch=hatch_l[type_merged[i + 1]])
+    ax2.set_ylim((0, 100))
+    ax2.set_ylabel("Flights per day \n" r"depending on $BT$ (%)")
+
+    for i in range(len(order_unique) - 1):
+        ax3.fill_between(np.exp(x_grid), y_l_s_merged_f[i], y_l_s_merged_f[i + 1], linewidth=0.2,
+                         color=cmap(colors_sorted[i + 1]), edgecolors=edge_colors[type_merged[i + 1]],
+                         hatch=hatch_l[type_merged[i + 1]])
+    ax3.set_ylim((0, 100))
+    # ax3.text(1.65,50,'6', color = 'white', fontsize = 15)
+    ax3.text(3.2, 50, '4', color='white', fontsize=15)
+    ax3.text(6, 50, '2', color='white', fontsize=15)
+    # ax3.text(13,25,'1', color = 'white', fontsize = 15)
+
+    ax3.set_ylabel("Flights per day \n" r"depending on $BT_{avg}$ (%)")
+
+    x_ticks = np.arange(1, 15, 1)
+    ax1.plot(np.exp(x_grid), y_l_i_merged[-1] / np.exp(x_grid)*reso/largeur_x, color='0.5', label='Block time')
+    ax1.plot(np.exp(x_grid), y_l_s_merged[-1] / np.exp(x_grid)*reso/largeur_x, color='0.1', linestyle='--',
+             label='Series avg block time')
+    ax1.legend(framealpha=1)
+    ind_max = int(np.log10(max(y_l_i_merged[-1] / np.exp(x_grid)*reso/largeur_x)))+1
+    max_y = 10 ** ind_max
+    min_y = 10 ** (ind_max-4)
+    ax1.set_yscale('log')
+    ax1.set_ylim(bottom=min_y, top=max_y)
+    ax1.set_ylabel('Flights densities ' r'($h^{-1}$)')
+    ax1.grid(True, axis='both', linestyle='--', linewidth=0.3, color='gray')
+
+    plt.xticks(x_ticks, x_ticks)
+    plt.xlim((min_fh, max_fh))
+
+    plt.xlabel(r'Filed block time $BT$ or $BT_{avg}$ (h)')
+    plt.savefig('figures/productivity_figures/' + title + '.pdf', format='pdf', bbox_inches='tight')
+    plt.close()
+    print('ok.')
+    return(None)
+
+def streaks_matrix(array, min_fh = 0.5, max_fh = 14, sigma = 0.02, reso = 1000, title = 'streak_matrix'):
+    largeur_x = np.log(max_fh) - np.log(min_fh)
+    min_fh_eq = min_fh * np.exp( - largeur_x / 2 / (reso - 1))  # a adapter selon le type de colormesh, on répartit avec un facteur 2 sinon
+    max_fh_eq = max_fh * np.exp( largeur_x / 2 / (reso - 1))
     sigma_x, sigma_y = sigma, sigma
+    x = array[:,0]* (1 - sigma_x ** 2 / 2)
+    y = array[:,2] * (1 - sigma_y ** 2 / 2)
     # Histogramme 2D sur grille régulière
+    grouping_matrix, x_, y_ = vis_ref.smooth_ln_2d(x, y, np.ones(x.shape[0]), [min_fh_eq, max_fh_eq],
+                                        [min_fh_eq, max_fh_eq], reso, sigma_x, sigma_y)
+    grouping_matrix = grouping_matrix.transpose()
+    x_abs = np.exp(x_)
+    y_abs = np.exp(y_)
+    X, Y = np.meshgrid(x_abs, y_abs)
 
-    H, xedges, yedges = np.histogram2d(x, y, bins=reso,
-                                       range=[[np.log(x_min_eq), np.log(x_max_eq)],
-                                              [np.log(y_min_eq), np.log(y_max_eq)]])
-    # Conversion des écarts-types en unités de bin
-    sigma_x_pix = sigma_x / ((xedges[-1] - xedges[0]) / len(xedges))
-    sigma_y_pix = sigma_y / ((yedges[-1] - yedges[0]) / len(yedges))
+    grouping_flights = grouping_matrix.sum(axis=0) / x_abs * reso/largeur_x
+    grouping_series = grouping_matrix.sum(axis=1) / y_abs * reso/largeur_x
+    grouping_matrix_d = grouping_matrix / x_abs[:, np.newaxis] / y_abs[np.newaxis,:] * reso ** 2/largeur_x**2  ## Pour normaliser à l'échelle
 
-    # Convolution gaussienne (FFT, très rapide)
-    Z1 = gaussian_filter(H, sigma=[sigma_x_pix, sigma_y_pix])
-    # Normalisation sur chaque ligne
-    # Coordonnées centrales
-    xi = 0.5 * (xedges[1:] + xedges[:-1])
-    yi = 0.5 * (yedges[1:] + yedges[:-1])
-    Z_small = Z1.reshape(Z1.shape[0] // factor, factor, Z1.shape[1] // factor, factor).mean(axis=(1, 3))
-    xi_small = xi.reshape(-1, factor).mean(axis=1)
-    yi_small = yi.reshape(-1, factor).mean(axis=1)
-    X, Y = np.meshgrid(np.exp(xi_small), np.exp(yi_small))
-    Flights_small = Z_small.sum(axis=1) / np.exp(xi_small) * reso
-    Series_small = Z_small.sum(axis=0) / np.exp(yi_small) * reso
-    Z_small = Z_small / np.exp(xi_small)[:, np.newaxis] / np.exp(yi_small)[np.newaxis,
-                                                          :] * reso ** 2  ## Pour normaliser à l'échelle
-    z_ref = 10 ** (int(np.log(Z_small.max()) / np.log(10) + 0.5))
-    Z_small = np.where(Z_small > z_ref, z_ref, Z_small)
-    Z_small_nan = np.where(Z_small < 0, np.nan, Z_small)
+    z_ref = 10 ** (int(np.log10(grouping_matrix_d.max()) + 0.5))
+    grouping_matrix_d = np.where(grouping_matrix_d > z_ref, z_ref, grouping_matrix_d)
+    # Z_small_nan = np.where(Z_small < 0, np.nan, Z_small)
     levs = (np.array(
         [u for u in [0.0056, 0.01, 0.018, 0.03, 0.056, 0.1, 0.18, 0.3, 0.56, 1, 1.8, 3, 5.6, 10, 18, 30, 56, 100] if
          u >= 0]) / 100 * z_ref)
 
     sns.set(style='whitegrid')
     fig = plt.figure(figsize=(10, 8))
-    grid = plt.GridSpec(4, 18, hspace=0.05, wspace=0.1)  # 5 colonnes pour la colorbar à droite
+    grid = plt.GridSpec(4, 18, hspace=0.15, wspace=0.5)  # 5 colonnes pour la colorbar à droite
     main_ax = fig.add_subplot(grid[1:4, 0:13])
     main_ax.grid(True, linestyle='--', linewidth=0.5, color='0.2')
-    im = main_ax.contourf(np.exp(xi_small), np.exp(yi_small), Z_small_nan.T, levs, norm=mcolors.LogNorm(),
-                          cmap='gist_ncar')
+    im = main_ax.contourf(x_abs, y_abs, grouping_matrix_d, levs, norm=mcolors.LogNorm(),cmap='gist_ncar')
     cax = fig.add_subplot(grid[1:4, 17])
     cbar = plt.colorbar(im, cax)
-    contours = main_ax.contour(np.exp(xi_small), np.exp(yi_small), Z_small_nan.T, levels=levs[1:], zorder=2,
-                               linewidths=0.5, colors='black', linestyles='-')
+    main_ax.contour(x_abs, y_abs, grouping_matrix_d, levels=levs[1:], zorder=2,linewidths=0.5, colors='black', linestyles='-')
+    puissance_ref = int(np.log10(max(grouping_flights.max(), grouping_flights.max()))) + 1
+
     x_density_ax = fig.add_subplot(grid[0, 0:13])
-    x_density_ax.plot(np.exp(xi_small), Flights_small, color='mediumblue', linewidth=3)
-    x_density_ax.plot(np.exp(xi_small), Series_small, color='firebrick', linewidth=1, linestyle='--')
+    x_density_ax.plot(x_abs, grouping_flights, color='mediumblue', linewidth=3)
+    x_density_ax.plot(x_abs, grouping_series, color='firebrick', linewidth=1, linestyle='--')
     x_density_ax.set_ylabel('Marg. distrib.' + r' ($h^{-1}$)', fontsize=13)
     x_density_ax.set_yscale('log')
-    x_density_ax.set_xlim((x_min, x_max))
-    x_density_ax.grid(True, linestyle='--', linewidth=0.6, color='grey', axis='both')
-    x_density_ax.set_ylim((10 ** puissance_ref, 10 ** (puissance_ref + 4)))
+    x_density_ax.grid(True, linestyle='--', linewidth=0.6, color='grey', axis='x')
+    x_density_ax.set_xlim((min_fh, max_fh))
+    x_density_ax.set_ylim((10 ** (puissance_ref-4), 10 ** puissance_ref))
+
     y_density_ax = fig.add_subplot(grid[1:4, 13:17])
-    y_density_ax.plot(Series_small, np.exp(xi_small), color='firebrick', linewidth=3)
-    y_density_ax.plot(Flights_small, np.exp(xi_small), color='mediumblue', linewidth=1, linestyle='--')
+    y_density_ax.plot(grouping_series, y_abs, color='firebrick', linewidth=3)
+    y_density_ax.plot(grouping_flights, y_abs, color='mediumblue', linewidth=1, linestyle='--')
     y_density_ax.set_xlabel('Marg. distrib.' + r' ($h^{-1}$)', fontsize=13)
     y_density_ax.set_xscale('log')
-    y_density_ax.set_xlim((10 ** puissance_ref, 10 ** (puissance_ref + 4)))
+    y_density_ax.set_xlim((10 ** (puissance_ref-4), 10 ** puissance_ref))
     y_density_ax.grid(True, linestyle='--', linewidth=0.6, color='grey', axis='y')
-    y_density_ax.set_ylim((y_min, y_max))
-    for u in range(5):
-        y_density_ax.plot([10 ** (puissance_ref + u), 10 ** (puissance_ref + u)], [y_min, y_max], linestyle='--',
+    y_density_ax.set_ylim((min_fh, max_fh))
+    for u in range(1,4):
+        y_density_ax.plot([10 ** (puissance_ref - u), 10 ** (puissance_ref - u)], [min_fh, max_fh], linestyle='--',
+                          color='grey', linewidth=0.6)
+        x_density_ax.plot([min_fh, max_fh],[10 ** (puissance_ref - u), 10 ** (puissance_ref - u)], linestyle='--',
                           color='grey', linewidth=0.6)
 
     for level in levs:
@@ -624,29 +756,27 @@ def streaks_matrix(x_min, x_max, x, y, sigma, reso, factor, titre, puissance_ref
     # plt.xscale('log')
     # plt.yscale('log')
     main_ax.tick_params(axis='both', which='both', color='0.7', length=6, width=1, direction='out')
-    extr = 2 * (int(x_max) // 2)
+    extr = 2 * (int(max_fh) // 2)
 
-    x_ticks = [1 / 2, 1, 2, 3, 4, 5] + list(np.linspace(6, extr, (extr - 6) // 2 + 1))
-    y_ticks = [1 / 2, 1, 2, 3, 4, 5] + list(np.linspace(6, extr, (extr - 6) // 2 + 1))
+    x_ticks = [1 / 2, 1, 2, 3, 4, 5] + list(np.arange(6,extr+2,2))
+    y_ticks = [1 / 2, 1, 2, 3, 4, 5] + list(np.arange(6,extr+2,2))
     main_ax.set_xticks(x_ticks, ['30mn'] + [str(v) for v in x_ticks[1:]], fontsize=12)
     main_ax.set_yticks(y_ticks, ['30mn'] + [str(v) for v in y_ticks[1:]], fontsize=12)
     y_density_ax.set_yticks(y_ticks, [''] * len(y_ticks))
     x_density_ax.set_xticks(x_ticks, [''] * len(x_ticks))
-    x_density_ax.set_yticks([10 ** u for u in range(puissance_ref, puissance_ref + 5)],
-                            [fr'$10^{exposant}$' for exposant in range(puissance_ref, puissance_ref + 5)])
-    y_density_ax.set_xticks([10 ** u for u in range(puissance_ref, puissance_ref + 5)],
-                            [fr'$10^{exposant}$' for exposant in range(puissance_ref, puissance_ref + 5)])
+    x_density_ax.set_yticks([10 ** u for u in range(puissance_ref-4, puissance_ref + 1)],
+                            [fr'$10^{exposant}$' for exposant in range(puissance_ref-4, puissance_ref + 1)],
+                             fontsize = 11)
+    y_density_ax.set_xticks([10 ** u for u in range(puissance_ref-4, puissance_ref + 1)],
+                            [fr'$10^{exposant}$' for exposant in range(puissance_ref-4, puissance_ref + 1)],
+                            fontsize = 11)
 
-    main_ax.plot([x_min, x_max], [y_min, y_max], color='black', linestyle='--')
+    main_ax.plot([min_fh, max_fh], [min_fh, max_fh], color='black', linestyle='--')
     main_ax.set_xlabel('Flight filed block time (h)', fontsize=16, color='mediumblue')
     main_ax.set_ylabel('Series avg filed block time (h)', fontsize=16, color='firebrick')
-    main_ax.set_xlim((x_min, x_max))
-    main_ax.set_ylim((y_min, y_max))
-    # ax = plt.gca()
-    # ax.xaxis.set_major_locator(FixedLocator(x_ticks))
-    # ax.yaxis.set_major_locator(FixedLocator(y_ticks))
-    plt.savefig('regimes//Flight_grouping_' + titre + '.pdf')
-    plt.show()
-
-def visu_flight_streaks():
+    main_ax.set_xlim((min_fh, max_fh))
+    main_ax.set_ylim((min_fh, max_fh))
+    plt.savefig('figures/productivity_figures//' + title + '.pdf')
+    plt.close()
     return(None)
+

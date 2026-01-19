@@ -91,12 +91,12 @@ def market_vis(df, name_fig ='test_market', title_fig = None,  color_mix = vis_r
         Input_i = Input_ac[Input_ac_n == selec[i],:]
         Moys.append(np.array([(Input_i[:, 0]* Input_i[:, 2]).sum() / (Input_i[:, 2].sum()),
                     (Input_i[:, 1]* Input_i[:, 2]).sum() / (Input_i[:, 2].sum())]))
-        Res_x_e[i + 1, :] = vis_ref.smooth_ln_1d(Input_i[:, 0],Input_i[:, 2],dist_limits,reso,  smooth_param_x = smooth_x)
-        Res_y_e[i + 1, :] = vis_ref.smooth_ln_1d(Input_i[:, 1]/period_duration,Input_i[:, 2], capac_limits,reso,  smooth_param_x = smooth_y)
+        Res_x_e[i + 1, :] = vis_ref.smooth_ln_1d(Input_i[:, 0],Input_i[:, 2],dist_limits,reso,  smooth_param_x = smooth_x)[0]
+        Res_y_e[i + 1, :] = vis_ref.smooth_ln_1d(Input_i[:, 1]/period_duration,Input_i[:, 2], capac_limits,reso,  smooth_param_x = smooth_y)[0]
         Obs_tots.append(Input_i[:, 2].sum())
     Input_i = Input_ac[~(np.isin(Input_ac_n, np.array(selec))), :]
-    Res_x_e[n_market + 1, :] = vis_ref.smooth_ln_1d(Input_i[:, 0],Input_i[:, 2],dist_limits,reso,  smooth_param_x = smooth_x)
-    Res_y_e[n_market + 1, :] = vis_ref.smooth_ln_1d(Input_i[:, 1]/period_duration,Input_i[:, 2], capac_limits,reso,  smooth_param_x = smooth_y)
+    Res_x_e[n_market + 1, :] = vis_ref.smooth_ln_1d(Input_i[:, 0],Input_i[:, 2],dist_limits,reso,  smooth_param_x = smooth_x)[0]
+    Res_y_e[n_market + 1, :] = vis_ref.smooth_ln_1d(Input_i[:, 1]/period_duration,Input_i[:, 2], capac_limits,reso,  smooth_param_x = smooth_y)[0]
     Obs_tots.append(Input_i[:, 2].sum())
     Res_x_e = Res_x_e.cumsum(axis=0)
     Res_y_e = Res_y_e.cumsum(axis=0)

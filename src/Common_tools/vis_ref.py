@@ -33,7 +33,9 @@ def smooth_ln_1d(X, Z, limits_x, reso, factor=4, smooth_param_x=1.0):
     )
     H_smooth = gaussian_filter(H, sigma=smooth_param_x/((xedges[-1]-xedges[0])/len(xedges)))
     H_small = H_smooth.reshape(H_smooth.shape[0] // factor, factor).sum(axis=1)
-    return H_small
+    xi = 0.5 * (xedges[1:] + xedges[:-1])
+    xi_small = xi.reshape(-1, factor).mean(axis=1)
+    return H_small, xi_small
 
 ## Lissage 2D
 def smooth_ln_2d(X, Y, Z, limits_x, limits_y, reso, smooth_param_x, smooth_param_y, factor = 4):
