@@ -563,7 +563,7 @@ def constru_flight_streak(df):
     print('100 %, ok.')
     return series_tot
 
-def visu_flight_streaks(array, min_fh = 0.5, max_fh = 14, reso = 200, sigma = 0.02, title = 'regimes_all'):
+def visu_flight_streaks(array, min_fh = 0.5, max_fh = 14, reso = 200, sigma = 0.02, title = 'regimes_all', n_s = None):
     plt.style.use('default')
     cmap = cm.get_cmap('gist_ncar')
     n_d = 10
@@ -670,11 +670,13 @@ def visu_flight_streaks(array, min_fh = 0.5, max_fh = 14, reso = 200, sigma = 0.
     ax1.plot(np.exp(x_grid), y_l_s_merged[-1] / np.exp(x_grid)*reso/largeur_x, color='0.1', linestyle='--',
              label='Series avg block time')
     ax1.legend(framealpha=1)
-    ind_max = int(np.log10(max(y_l_i_merged[-1] / np.exp(x_grid)*reso/largeur_x)))+1
-    max_y = 10 ** ind_max
-    min_y = 10 ** (ind_max-4)
+    ind_max = int(np.log10(max(max(y_l_i_merged[-1] / np.exp(x_grid)*reso/largeur_x),max(y_l_s_merged[-1] / np.exp(x_grid)*reso/largeur_x))))+1
+    # max_y = 10 ** ind_max
+    if n_s is None :
+        min_y = 10 ** (ind_max-5)
+    else : min_y = 10**n_s
     ax1.set_yscale('log')
-    ax1.set_ylim(bottom=min_y, top=max_y)
+    ax1.set_ylim(bottom=min_y)
     ax1.set_ylabel('Flights densities ' r'($h^{-1}$)')
     ax1.grid(True, axis='both', linestyle='--', linewidth=0.3, color='gray')
 
