@@ -18,7 +18,7 @@ from matplotlib.patches import Rectangle
 import imageio.v2 as imageio
 import importlib
 from src.Common_tools import vis_ref
-importlib.reload(vis_ref)
+# importlib.reload(vis_ref)
 
 
 #The entry dataset can contain the following columns :
@@ -30,7 +30,6 @@ importlib.reload(vis_ref)
 # 2) to visualize the market shares of a selection regarding aircraft operator or aircraft type depending on different indicators
 # 3) to observe market composition and share over longer periods
 # the market composition observations need to be harmonious in terms of colors and heights
-
 
 def market_vis(df, name_fig ='test_market', title_fig = None,  color_mix = vis_ref.colors_22, rank = None, color_rank =None,
                market = 'Aircraft Type', observation = 'ASK', dist_limits =(4e2, 1.9e4), capac_limits = (9e3, 4e6),

@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import random as rd
 import matplotlib.pyplot as plt
+import seaborn as sns
 ### the entry dataset is composed of several columns : 'Aircraft Type','Engine', 'Delivery Date', 'Status', 'Event Date'
 ### Status vaut written off, stored ou active
 ### Each column describes an engine which is or was part of the fleet
