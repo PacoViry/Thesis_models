@@ -14,7 +14,8 @@ colors_22 = [ '0',"#1f77b4", "#aec7e8", "#ff7f0e", "#ffbb78", "#2ca02c", "#98df8
     "#d62728", "#ff9896", "#9467bd", "#c5b0d5", "#8c564b", "#c49c94",
     "#e377c2", "#f7b6d2", "#7f7f7f", "#c7c7c7", "#bcbd22", "#dbdb8d",
     "#17becf", "#9edae5", '0.95']
-marker_type = ['+','x','o','s','^','D']
+marker_type = ['o','s','^','P','X','*']
+sizes = [30,30,35,40,40,60]
 symb = ['o', 's', '^', 'v', '<', '>', 'd', 'p', 'h', '*', 'D', 'X', 'P', 'H', '8']
 
 ## Visualisation des couleurs
@@ -129,3 +130,14 @@ def color_lists(lists):
             return None
 
     return coloring
+
+
+def weighted_quantile(x, w, q):
+    order = np.argsort(x)
+    x_sorted = x[order]
+    w_sorted = w[order]
+
+    cw = np.cumsum(w_sorted)
+    cw /= cw[-1]  # normalisation
+
+    return np.interp(q, cw, x_sorted)

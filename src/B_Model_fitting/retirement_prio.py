@@ -8,7 +8,7 @@ import seaborn as sns
 ### Each column describes an engine which is or was part of the fleet
 # The following module contains :
 # 1) A function to compute individual coefficients fitting a statistical model
-# 2) A function to compute these coefficients based on a linear age representation.
+# 2) A function to compute these coefficients based on a linear age representation. (a remplir!)
 
 
 def setting_df(ac_df):
@@ -141,7 +141,6 @@ def l_v(liste_r, params):
     year_max = liste_r['Delivery Date'].max()
     classements = liste_r['rank'].unique()[:-1]
     liste_modeles = sorted(liste_r['Aircraft Type'].unique())
-
     l_v = 0
     propensions = ini_propensions(params)
 
@@ -163,19 +162,19 @@ def l_v(liste_r, params):
         Probs[mod, mill] += -propensions[mod, mill]
     return (l_v)
 
-def fit_type_y(df, N = 50, M = 30):
+def fit_type_y(df, N = 50, M = 30, vals = None):
     list_ac = sorted(df['Aircraft Type'].unique())
     df['Delivery Date'] = df['Delivery Date'].astype(int)
     year_min = df['Delivery Date'].min()
     year_max = df['Delivery Date'].max()
-
-    vals = np.zeros((len(list_ac), year_max - year_min + 1))
+    if vals is None :
+        vals = np.zeros((len(list_ac), year_max - year_min + 1))
     v_list = []
     for i in range(N):
         print(str(i), end = ': ')
         rd_file = random_list(df, vals)
         v_list.append(l_v(rd_file, vals))
-        print(v_list[-1], end=', ')
+        print(int(10**4*v_list[-1])/10**4, end=', ')
         m = 1
         for q in range(1, M):
             m+= -1
@@ -193,8 +192,9 @@ def fit_type_y(df, N = 50, M = 30):
                     m -= 1
                     l_v_ref = l_v(rd_file, vals + 0.01 * u * 2 ** m)
             vals += 0.01 * u * 2 ** (m)
-            print(l_v_ref, end = ', ')
+            print(int(10**4*l_v_ref)/10**4, end = ', ')
             v_list.append(l_v_ref)
+        print('')
     print ('ok')
     v_list.append(l_v(df, vals))
     vals3 = np.where(vals == 0.0, np.nan, vals)
@@ -211,3 +211,16 @@ def save_prop(vals, list_ac, y_lims, title = 'propensions_test'):
     with pd.ExcelWriter(excel_path) as writer:
         save.to_excel(writer, sheet_name='propensions', index=True)
     return None
+
+
+def load_prop(title='propensions_test'):
+    excel_path = 'data//retirement_propensions//' + title + '.xlsx'
+    df = pd.read_excel(
+        excel_path,
+        sheet_name='propensions',
+        index_col=0
+    )
+    y_lims = (int(df.index.min()), int(df.index.max()))
+    list_ac = list(df.columns)
+    vals = df.values
+    return vals, list_ac, y_lims

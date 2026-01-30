@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import matplotlib.dates as mdates
 import matplotlib.cm as cm
-from matplotlib.dates import MO, TU, WE, TH, FR, SA, SU
+from matplotlib.dates import MO
 from matplotlib.ticker import FixedLocator
 from scipy.ndimage import gaussian_filter1d
 from src.Common_tools import vis_ref
@@ -381,7 +381,9 @@ def visu(exemple, titre = 'ac_calendar', visu = True, x_min = None):
             d = int(current_time.weekday())
             plt.text(x=mdates.date2num(current_time) + 9.4 / 24, y=0.02, s=L_date[d], color='orange', fontsize=14)
         if x_min is not None:
-            ax.barh(y=0.55, left=mdates.date2num(lim_time), width=4 / 3 / 24, height=0.85, color='red', linewidth=0)
+            ax.barh(y=0.55, left=mdates.date2num(lim_time), width=4 / 3 / 24, height=0.85, color='red', linewidth=0,zorder=1)
+            for i in range(15):
+                ax.barh(y=0.23+i*0.7/14, left=mdates.date2num(lim_time), width=4 / 3 / 24, height=0.02, color='red', linewidth=0,zorder=3)
             lim_time = lim_time + pd.Timedelta(days=1)
         current_time += pd.Timedelta(days=1)
 
@@ -389,7 +391,7 @@ def visu(exemple, titre = 'ac_calendar', visu = True, x_min = None):
     for i, row in exemple.iterrows():
         start = row['ACTUAL OFF BLOCK TIME']
         end = row['ACTUAL ARRIVAL TIME']
-        ax.barh(y=0.55, left=start, width=(end - start), height=0.7, color="blue", alpha=1, linewidth=0)
+        ax.barh(y=0.55, left=start, width=(end - start), height=0.7, color="blue", alpha=1, linewidth=0, zorder =2)
 
     # Configuration de l'axe temporel
     ax.set_xlim(start_time, end_time)  # Pour inclure le dernier jour

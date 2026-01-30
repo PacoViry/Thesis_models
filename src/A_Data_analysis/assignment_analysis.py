@@ -23,13 +23,48 @@ from src.Common_tools import vis_ref
 
 #The entry dataset can contain the following columns :
 # 'ADEP', 'ADEP Name',  'ADES', 'ADES Name', 'Period', 'Aircraft Type', 'Aircraft Type Name', 'Aircraft Operator','Aircraft Operator Name',
-# 'N_flights', 'Seats', 'ASK', 'Activity', 'Distance_conn (km)', 'Flights_conn_p',
+# 'N_flights', 'Seats', 'ASK', 'Activity', 'Distance', 'Distance_conn (km)', 'Flights_conn_p',
 # 'Seats_conn_p', 'ASK_conn_p', 'Activity_conn_p', 'Weight'
 #The following module allows :
 # 1) to vizualize the market composition regarding aircraft operator or aircraft type depending on different indicators
 # 2) to visualize the market shares of a selection regarding aircraft operator or aircraft type depending on different indicators
 # 3) to observe market composition and share over longer periods
 # the market composition observations need to be harmonious in terms of colors and heights
+
+def agg_ind(df):
+    g = df.groupby(['ADEP', 'ADES', 'Period'])
+    distance_conn = (pd.concat([g['Seats'].sum().rename('Seats_sum'),
+                                (df['Seats'] * df['Distance'])
+                               .groupby([df['ADEP'], df['ADES'], df['Period']])
+                               .sum()
+                               .rename('SeatsDist_sum')], axis=1)
+    .assign(**{'Distance_conn (km)': lambda df: df['SeatsDist_sum'] / df['Seats_sum']})
+    .reset_index()[['ADEP', 'ADES', 'Period', 'Distance_conn (km)']])
+
+    seats_conn_p = (
+        df.groupby(['ADEP', 'ADES', 'Period'])['Seats']
+        .sum()
+        .reset_index()
+        .rename(columns={'Seats': 'Seats_conn_p'})
+    )
+    print('synthesis...')
+    df = pd.merge(
+        df,
+        distance_conn,
+        on=['ADEP', 'ADES', 'Period'],
+        how='left'
+    )
+    df = pd.merge(
+        df,
+        seats_conn_p,
+        on=['ADEP', 'ADES', 'Period'],
+        how='left'
+    )
+
+    df.drop(columns=['Distance'], inplace=True)
+    df['ASK_conn_p'] = df['Seats_conn_p'] * df['Distance_conn (km)']
+    df['ASK'] = df['Seats'] * df['Distance_conn (km)']
+    return df
 
 def market_vis(df, name_fig ='test_market', title_fig = None,  color_mix = vis_ref.colors_22, rank = None, color_rank =None,
                market = 'Aircraft Type', observation = 'ASK', dist_limits =(4e2, 1.9e4), capac_limits = (9e3, 4e6),
@@ -116,16 +151,19 @@ def market_vis(df, name_fig ='test_market', title_fig = None,  color_mix = vis_r
                         cmap='Spectral_r', shading='gouraud')
     contour = main_ax.contour(X, Y, 100*np.array(traf_cum),levels = 100*np.array(quanti), colors = 'black',
                               linewidths=[1.6, 0.9, 0.9, 0.5], linestyles = ['-', '-', '--', '--'],zorder = 2)
-    contour2 = main_ax.contour(X, Y, 100*np.array(traf_cum), levels=100*np.array(quanti), colors='black',alpha = 0.3,
+    main_ax.contour(X, Y, 100*np.array(traf_cum), levels=100*np.array(quanti), colors='black',alpha = 0.3,
                                linewidths=[1.6, 0.9, 0.9, 0.5], linestyles = ['-', '-', '--', '--'], zorder=1)
     manual_positions = [
-        (dist_limits[0] * (dist_limits[1] / dist_limits[0]) ** 0.45,
+        (dist_limits[0] * (dist_limits[1] / dist_limits[0]) ** 0.2,
+         capac_limits[0] * (capac_limits[1] / capac_limits[0]) ** 0),
+        (dist_limits[0] * (dist_limits[1] / dist_limits[0]) ** 0.33,
+         capac_limits[0] * (capac_limits[1] / capac_limits[0]) ** 0.30),
+        (dist_limits[0] * (dist_limits[1] / dist_limits[0]) ** 0.43,
          capac_limits[0] * (capac_limits[1] / capac_limits[0]) ** 0.40),
         (dist_limits[0] * (dist_limits[1] / dist_limits[0]) ** 0.55,
-         capac_limits[0] * (capac_limits[1] / capac_limits[0]) ** 0.45),
-        (dist_limits[0] * (dist_limits[1] / dist_limits[0]) ** 0.6,
          capac_limits[0] * (capac_limits[1] / capac_limits[0]) ** 0.55),
     ]
+
     clabels1 = main_ax.clabel(contour, inline=True, fontsize=12, inline_spacing=8, manual=manual_positions)
     for label in clabels1:
         label.set_bbox({'facecolor': 'none', 'alpha': 0.9, 'edgecolor': 'none'})
@@ -461,6 +499,7 @@ def dynamic_market_vis(df, periods, name_periods = None, video_name = 'test_vide
         traff_x_max = traff_matrix.sum(axis = 0).max()*1.05
         traff_y_max = traff_matrix.sum(axis=1).max()*1.2
 
+    selec_df = df[df['Period'].isin(periods)]
     #nettoyage des images existantes
     for filename in os.listdir('figures/video_storage/'):
         if filename.endswith(".png"):
