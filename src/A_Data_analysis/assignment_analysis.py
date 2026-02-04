@@ -31,7 +31,7 @@ from src.Common_tools import vis_ref
 # 3) to observe market composition and share over longer periods
 # the market composition observations need to be harmonious in terms of colors and heights
 
-def agg_ind(df):
+def agg_ind_1(df):
     g = df.groupby(['ADEP', 'ADES', 'Period'])
     distance_conn = (pd.concat([g['Seats'].sum().rename('Seats_sum'),
                                 (df['Seats'] * df['Distance'])
@@ -60,10 +60,26 @@ def agg_ind(df):
         on=['ADEP', 'ADES', 'Period'],
         how='left'
     )
-
     df.drop(columns=['Distance'], inplace=True)
-    df['ASK_conn_p'] = df['Seats_conn_p'] * df['Distance_conn (km)']
+    # df['ASK_conn_p'] = df['Seats_conn_p'] * df['Distance_conn (km)']
     df['ASK'] = df['Seats'] * df['Distance_conn (km)']
+    return df
+
+def agg_ind_s(df, observation = 'ASK'):
+    obs_conn_p = (
+        df.groupby(['ADEP', 'ADES', 'Period'])[observation]
+        .sum()
+        .reset_index()
+        .rename(columns={observation: observation+'_conn_p'})
+    )
+
+    df = pd.merge(
+        df,
+        obs_conn_p,
+        on=['ADEP', 'ADES', 'Period'],
+        how='left'
+    )
+
     return df
 
 def market_vis(df, name_fig ='test_market', title_fig = None,  color_mix = vis_ref.colors_22, rank = None, color_rank =None,
@@ -72,7 +88,8 @@ def market_vis(df, name_fig ='test_market', title_fig = None,  color_mix = vis_r
                   n_market = 12, reso = 400, smooth_param = 0.05, period_duration = 1, weight = False):
     #On peut étudier les flux par aéroport, opérateur, avion. Selon les ASKs, sieges ou nombre de vols
     #dimensions du graphe et du lissage
-    fontsize_legend  = int(65/n_market**0.7)
+    plt.style.use('default')
+    fontsize_legend  = min(int(65/n_market**0.7),int(65/12**0.7))
     dimensions = (14,10)
     width_grid, height_grid = 21,8
     width_main, height_main = 17, 5
@@ -94,7 +111,6 @@ def market_vis(df, name_fig ='test_market', title_fig = None,  color_mix = vis_r
         selec_0 = selec_0.assign(_rank=selec_0[market].map(rank)).sort_values('_rank').drop(columns='_rank').reset_index()
     selec = selec_0[market]
     selec_n = selec_0[market+' Name'][:n_market]
-    
     if weight:
         int_traff = df[list({'ADEP', 'ADES', 'Distance_conn (km)', 'Seats_conn_p', observation + '_conn_p',
                         'Weight'})].drop_duplicates(subset=['ADES', 'ADEP'], keep='first')[
@@ -188,7 +204,6 @@ def market_vis(df, name_fig ='test_market', title_fig = None,  color_mix = vis_r
     main_ax.yaxis.set_major_formatter(formatter)
     main_ax.yaxis.set_minor_formatter(formatter)
     main_ax.grid(True, axis='both', which= 'major',linestyle='--',linewidth=0.5,color='0.2')
-
     exponent = int(np.log10(market_types[observation][0]))
     for j in range(len(Moys)): #posera peut être un jour problème pour bien garder un ordre correct, ne pas trier et reordonner? (regarder l'ancien code)
         x_density_ax.fill_between(X,Res_x_e[j], Res_x_e[j+1],color = color_mix[color_rank[selec[j]]],

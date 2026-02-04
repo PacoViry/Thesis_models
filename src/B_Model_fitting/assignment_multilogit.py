@@ -57,26 +57,26 @@ def data_formatting(df, seuils_f = 0.01, n_ac = 60, obs = 'ASK', weight = True, 
     df_f2['Period'] = df_f2['Period'] - period_min
     if save_techn_carac:
         df_tech = pd.DataFrame({'Aircraft Type': unique_ids,'Aircraft Type Name': unique_names, obs+'_weight': l_w,'Est_avg_seats': l_seats,  'Est_max_range': max_dist})
-        df_tech.to_excel('data//assignment_tech//BTS_'+str(n_ac)+'_'+str(n_y)+'.xlsx')
+        df_tech.to_excel('data//assignment_tech//BTS_'+obs+'_'+str(n_ac)+'_'+str(n_y)+'.xlsx')
     #volumes modeled per connection (used for validation)
 
     obs_conn_p = (
-        df_f2.groupby(['Period','Distance_conn (km)', 'Seats_conn_p','ASK_conn_p'])[obs+'_w']
+        df_f2.groupby(['Period','Distance_conn (km)', 'Seats_conn_p',obs+'_conn_p'])[obs+'_w']
         .sum()
         .reset_index()
         .rename(columns={obs+'_w': obs+'_w_mod'})
     )
-    conn = df_f2.drop_duplicates(subset=['Period', 'Distance_conn (km)', 'Seats_conn_p', 'ASK_conn_p'])[
-        ['Period', 'Distance_conn (km)', 'Seats_conn_p', 'ASK_conn_p']]
+    conn = df_f2.drop_duplicates(subset=['Period', 'Distance_conn (km)', 'Seats_conn_p', obs+'_conn_p'])[
+        ['Period', 'Distance_conn (km)', 'Seats_conn_p', obs+'_conn_p']]
 
     conn = pd.merge(conn,obs_conn_p,
-    on=['Period','Distance_conn (km)', 'Seats_conn_p','ASK_conn_p'],
+    on=['Period','Distance_conn (km)', 'Seats_conn_p',obs+'_conn_p'],
     how='left')
     #aircraft presence cache for the regression
     contingency_table = pd.crosstab(df_f2['Id_mod'], df_f2['Period'])
     binary_table = (contingency_table > 0).astype(int)
     aircraft_existence_cache = np.array(binary_table)
-    return df_f2[['Period', 'Distance_conn (km)', 'Seats_conn_p', 'ASK_conn_p', 'Id_mod', obs + '_w']], corr_table, aircraft_existence_cache, max_dist, conn
+    return df_f2[['Period', 'Distance_conn (km)', 'Seats_conn_p', obs+'_conn_p', 'Id_mod', obs + '_w']], corr_table, aircraft_existence_cache, max_dist, conn
 
 def log_likelihood_1_0(data_batch, cache, alphas, betas, omegas, ranges):
     us = (alphas[:, None] * data_batch[:, 1] + betas[:, None] * data_batch[:, 2]) + omegas[
@@ -85,7 +85,7 @@ def log_likelihood_1_0(data_batch, cache, alphas, betas, omegas, ranges):
         us)
     log_lik = np.sum(
         data_batch[:, 4] * (us[data_batch[:, 3].astype(int),np.arange(len(data_batch))] - np.log(pot.sum(axis=0))))
-    return log_lik, np.log( - log_lik)
+    return log_lik
 
 def gradient_1_0_fast(data_batch, cache, alphas, betas, omegas, ranges):
     # unpack
@@ -139,7 +139,7 @@ def fit_function(training_data, existence_cache, ranges, num_epochs = 100, n_bat
     likely = []
     likely.append(int(100000 *
                       log_likelihood_1_0(training_data, existence_cache, alphas, betas, omegas,
-                                                               ranges)[0]) / 100000)
+                                                               ranges)) / 100000)
     print(f"Without training {likely[-1]}")
     # Boucle d'entraînement
     for epoch in range(num_epochs):
@@ -170,7 +170,7 @@ def fit_function(training_data, existence_cache, ranges, num_epochs = 100, n_bat
             omegas += learning_rate * m_omegas_hat / (np.sqrt(v_omegas_hat) + epsilon)
         likely.append(int(100000 *
                           log_likelihood_1_0(training_data, existence_cache, alphas, betas,
-                                                                   omegas, ranges)[0]) / 100000)
+                                                                   omegas, ranges)) / 100000)
         if epoch % 5 == 0:
             print(f"Log-likelihood = {likely[-1]}")
         if epoch % 50 == 49:
@@ -219,22 +219,20 @@ def correspondance_table(title_coeffs = 'logit_model_bts_35_5_1_9',title_tech = 
         ['Aircraft Type Name', obs_choice + '_weight', 'Est_avg_seats', 'Est_max_range']].set_index(
         'Aircraft Type Name')
     data_table = pd.merge(tech_table, coeffs, left_index=True, right_index=True)
-    p_min = int(np.log10(data_table[obs_choice + '_weight'].min()))
-    data_table[obs_choice + '_weight'] = data_table[obs_choice + '_weight'] / 10 ** p_min
+    # p_min = int(np.log10(data_table[obs_choice + '_weight'].min())) #Pour normaliser, ici on l'enlève pour avoir une estimation réaliste pour le nombre d'avion neufs équivalents.
+    # data_table[obs_choice + '_weight'] = data_table[obs_choice + '_weight'] / 10 ** p_min
     return data_table
 
 def predict_assignt(conn_data, existence_cache, alphas, betas, omegas, ranges, d_norm = 15000, cap_norm = 15):
-    conn_data[:, 1] = conn_data[:, 1] / d_norm
-    conn_data[:, 2] = np.log(conn_data[:, 2]) / cap_norm
-
-    us = alphas.reshape(-1, 1) * conn_data[:, 1] + betas.reshape(-1, 1) * conn_data[:, 2] + omegas[
-        :, conn_data[:, 0].astype(int)]
-    pots = (ranges.reshape(-1, 1) >= conn_data[:, 2].reshape(1, -1)) * (
-    existence_cache[:, conn_data[:, 0].astype(int)]) * np.exp(us)
+    c_data = conn_data.copy()
+    c_data[:, 1] = c_data[:, 1] / d_norm
+    c_data[:, 2] = np.log(c_data[:, 2]) / cap_norm
+    ranges_b = ranges.copy()/d_norm
+    us = alphas.reshape(-1, 1) * c_data[:, 1] + betas.reshape(-1, 1) * c_data[:, 2] + omegas[
+        :, c_data[:, 0].astype(int)]
+    pots = (ranges_b.reshape(-1, 1) >= c_data[:, 1].reshape(1, -1)) * (
+    existence_cache[:, c_data[:, 0].astype(int)]) * np.exp(us)
     pots = pots / pots.sum(axis=0)
-
-    conn_data[:, 1] = conn_data[:, 1] * d_norm
-    conn_data[:, 2] = np.exp(conn_data[:, 2]* cap_norm)
     return pots
 
 def obs_comp(training_data, conn_data, pots, obs_norm, save = False, title = None):
@@ -336,14 +334,14 @@ def visu_coeffs(alphas, betas, names_ac,ds_name, d_norm = 1, cap_norm = 1):
     plt.figure(figsize=(5.5, 5.5))
     plt.grid(True, linestyle='--', linewidth=0.3, color='gray')
     n_ac = len(names_ac)
-    n_colors = -int(np.floor(-n_ac/6))
+    n_colors = min(10,-int(np.floor(-n_ac/6)))
     n_col = (n_ac-1)//19+1
     colors = vis_ref.colors_10[:n_colors]
     df_visu = pd.DataFrame({'alphas': alphas, 'betas': betas}, index=names_ac).sort_index()
     alphas = np.array(df_visu['alphas'])
     betas = np.array(df_visu['betas'])
     names_ac = df_visu.index.to_list()
-    for i in range(len(names_ac)):
+    for i in range(min(len(names_ac),59)):
         plt.scatter(alphas[i]/d_norm,betas[i]/cap_norm, s=1.5*vis_ref.sizes[i // n_colors], color=colors[i % n_colors], marker= vis_ref.marker_type[i // n_colors],
                     label= names_ac[i][:30], edgecolors='black', linewidth=0.5)
     plt.legend(markerscale=1.3, scatterpoints=1, ncol = n_col, bbox_to_anchor=(1, 1))
@@ -352,7 +350,7 @@ def visu_coeffs(alphas, betas, names_ac,ds_name, d_norm = 1, cap_norm = 1):
     plt.gca().xaxis.get_major_formatter().set_powerlimits((-1, 1))
     plt.xlabel('Impact of distance', fontsize=14)
     plt.ylabel('Impact of log(capacity)', fontsize=14)
-    plt.savefig('figures//assignment_figures//estim_model_' +ds_name+'.pdf', bbox_inches="tight", format='pdf')
+    plt.savefig('figures//estimators_figures//estim_model_' +ds_name+'.pdf', bbox_inches="tight", format='pdf')
     plt.show()
 
 def regressor_assign_coeffs(c_table, weight = False, obs_choice = 'ASK'):
@@ -406,10 +404,10 @@ def regressor_visu_model(c_table, alphas_coeff, betas_coeff, reg_name='test'):
     names_ac = c_table.index
     plt.figure(figsize=(5.5, 5.5))
     plt.grid(True, linestyle='--', linewidth=0.3, color='gray')
-    p_d = 10
+    p_d = 20
     p_s = 3
     u = 0
-    for sqrt_range in np.linspace(2000.05 ** (1 / p_d), 18000.5 ** (1 / p_d), 19):
+    for sqrt_range in np.linspace(1000.05 ** (1 / p_d), 18000.5 ** (1 / p_d), 19):
         ranges = 50 * int(sqrt_range ** p_d / 50)
         inputs = np.array([ranges * np.ones(500), np.linspace(40.5 ** (1 / p_s), 500.5 ** (1 / p_s), 500) ** p_s]).T
         sample_x = np.concatenate((inputs, np.log(inputs), 1 / inputs), axis=1)
@@ -423,7 +421,7 @@ def regressor_visu_model(c_table, alphas_coeff, betas_coeff, reg_name='test'):
     u = 0
     for cap in np.linspace(40.5 ** (1 / p_s), 500.5 ** (1 / p_s), 19):
         cap = 5 * int(cap ** p_s / 5)
-        inputs = np.array([np.linspace(2000.05**(1/p_d),18000.5**(1/p_d),500)**p_d,cap*np.ones(500)]).T
+        inputs = np.array([np.linspace(1000.05**(1/p_d),18000.5**(1/p_d),500)**p_d,cap*np.ones(500)]).T
         sample_x = np.concatenate((inputs, np.log(inputs), 1 / inputs), axis=1)
         alphas_sample = alphas_coeff[0] + alphas_coeff[1:] @ sample_x.T
         betas_sample = betas_coeff[0] + betas_coeff[1:] @ sample_x.T
@@ -433,37 +431,37 @@ def regressor_visu_model(c_table, alphas_coeff, betas_coeff, reg_name='test'):
         #   plt.plot(alphas_sample, betas_sample, color = 'r', linewidth = 0.5, linestyle = '--', alpha = 0.2)
         u += 1
     ann1 = np.array(
-        [50 * np.trunc(np.linspace(2000.05 ** (1 / p_d), 18000.5 ** (1 / p_d), 10) ** p_d / 50), 40 * np.ones(10)]).T
+        [50 * np.trunc(np.linspace(1000.05 ** (1 / p_d), 18000.5 ** (1 / p_d), 10) ** p_d / 50), 40 * np.ones(10)]).T
     ann2 = np.concatenate((ann1, np.log(ann1), 1 / ann1), axis=1)
     alphas_sample = alphas_coeff[0] + alphas_coeff[1:] @ ann2.T
     betas_sample = betas_coeff[0] + betas_coeff[1:] @ ann2.T
-    for i, label in enumerate(np.linspace(2000.05 ** (1 / p_d), 18000.5 ** (1 / p_d), 10) ** p_d):
+    for i, label in enumerate(np.linspace(1000.05 ** (1 / p_d), 18000.5 ** (1 / p_d), 10) ** p_d):
         plt.scatter(alphas_sample[i], betas_sample[i], color="darkblue", zorder=3, s=5, marker='s')
         plt.annotate(
-            str(50 * int(label / 50)),  # Le label à afficher
+            str(50 * int(label / 50+0.5)),  # Le label à afficher
             (alphas_sample[i], betas_sample[i]),  # Position (valeur réelle, prédiction)
             textcoords="offset points",  # Décalage par rapport à la position
             xytext=(-10, -12),  # Décalage en pixels (x, y)
             fontsize=8,  # Taille de la police
             color="darkblue"  # Couleur des annotations
         )
-    ann3 = np.array([2000*np.ones(10),5*np.trunc(np.linspace(40.5**(1/p_s),500.5**(1/p_s),10)**p_s/5)]).T
+    ann3 = np.array([1000*np.ones(10),5*np.trunc(np.linspace(40.5**(1/p_s),500.5**(1/p_s),10)**p_s/5)]).T
     ann4 = np.concatenate((ann3, np.log(ann3), 1 / ann3), axis=1)
     alphas_sample = alphas_coeff[0] + alphas_coeff[1:] @ ann4.T
     betas_sample = betas_coeff[0] + betas_coeff[1:] @ ann4.T
     for i, label in enumerate(np.linspace(40.5 ** (1 / p_s), 500.5 ** (1 / p_s), 10) ** p_s):
         plt.scatter(alphas_sample[i], betas_sample[i], color="darkred", zorder=3, s=5, marker='s')
         plt.annotate(
-            str(50 * int(label / 50)),  # Le label à afficher
+            str(5 * int(label / 5+0.5)),  # Le label à afficher
             (alphas_sample[i], betas_sample[i]),  # Position (valeur réelle, prédiction)
             textcoords="offset points",  # Décalage par rapport à la position
-            xytext=(-10, -12),  # Décalage en pixels (x, y)
+            xytext=(-18, -3),  # Décalage en pixels (x, y)
             fontsize=8,  # Taille de la police
             color="darkred"  # Couleur des annotations
         )
     plt.annotate(
         'MAX RANGE (km)',  # Le label à afficher
-        (6, -30),  # Position (valeur réelle, prédiction)
+        (-0.004, -2.4),  # Position (valeur réelle, prédiction)
         textcoords="offset points",  # Décalage par rapport à la position
         xytext=(0, 0),  # Décalage en pixels (x, y)
         fontsize=12,  # Taille de la police
@@ -471,7 +469,7 @@ def regressor_visu_model(c_table, alphas_coeff, betas_coeff, reg_name='test'):
     )
     plt.annotate(
         'AVG SEATS',  # Le label à afficher
-        (-55, 5),  # Position (valeur réelle, prédiction)
+        (-0.009, 0),  # Position (valeur réelle, prédiction)
         textcoords="offset points",  # Décalage par rapport à la position
         xytext=(0, 0),  # Décalage en pixels (x, y)
         fontsize=12,  # Taille de la police
@@ -479,10 +477,10 @@ def regressor_visu_model(c_table, alphas_coeff, betas_coeff, reg_name='test'):
     )
 
     n_ac = len(names_ac)
-    n_colors = -int(np.floor(-n_ac / 6))
+    n_colors = min(10,-int(np.floor(-n_ac/6)))
     n_col = (n_ac - 1) // 19 + 1
     colors = vis_ref.colors_10[:n_colors]
-    for i in range(len(names_ac)):
+    for i in range(min(len(names_ac),59)):
         plt.scatter(y1[i], y2[i], s=1.5 * vis_ref.sizes[i // n_colors],
                     color=colors[i % n_colors], marker=vis_ref.marker_type[i // n_colors],
                     label=names_ac[i][:30], edgecolors='black', linewidth=0.5)
@@ -492,9 +490,8 @@ def regressor_visu_model(c_table, alphas_coeff, betas_coeff, reg_name='test'):
     plt.gca().xaxis.get_major_formatter().set_powerlimits((-1, 1))
     plt.xlabel('Impact of distance', fontsize=14)
     plt.ylabel('Impact of log(capacity)', fontsize=14)
-    plt.savefig('figures//assignment_figures//visu_regressor_' + reg_name + '.pdf', bbox_inches="tight", format='pdf')
+    plt.savefig('figures//estmators_figures//visu_regressor_' + reg_name + '.pdf', bbox_inches="tight", format='pdf')
     plt.show()
-
 
 def assign_coeffs_pred(alphas_coeff, betas_coeff,seats_ac, range_ac):
     x = np.array([range_ac, seats_ac,np.log(range_ac), np.log(seats_ac), 1 / range_ac, 1 / seats_ac])

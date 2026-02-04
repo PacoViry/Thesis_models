@@ -4,6 +4,7 @@ import sys
 from scipy.ndimage import gaussian_filter
 import numpy as np
 import networkx as nx
+import pandas as pd
 print(sys.path)
 
 ###Définition des couleurs
@@ -131,7 +132,6 @@ def color_lists(lists):
 
     return coloring
 
-
 def weighted_quantile(x, w, q):
     order = np.argsort(x)
     x_sorted = x[order]
@@ -141,3 +141,13 @@ def weighted_quantile(x, w, q):
     cw /= cw[-1]  # normalisation
 
     return np.interp(q, cw, x_sorted)
+
+def date_to_float_year(date):
+    if type(date)!= float :
+        start_of_year = pd.Timestamp(year=date.year, month=1, day=1)
+        start_of_next_year = pd.Timestamp(year=date.year + 1, month=1, day=1)
+        year_length = (start_of_next_year - start_of_year).days
+        days_since_start_of_year = (date - start_of_year).days
+        return date.year + days_since_start_of_year / year_length
+    else :
+        return(date)
