@@ -2,8 +2,10 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import warnings
-from src.Common_tools.vis_ref import colors_5, colors_10, vis_colors
+from src.Common_tools.vis_ref import colors_5, colors_10,colors_22, vis_colors
 import numpy as np
+
+
 warnings.filterwarnings("ignore")
 
 Class_engines = ['AVON 527',0, 'AVON 531B',0, 'AVON 533R',0, 'BR715A1-30',2, 'BR715C1-30',2, 'CF6-45A2',0, ###mapping des types de moteurs dans la bdd
@@ -233,5 +235,80 @@ def retirement_ranking(df):
 
     df_a['rank'] = max(df_r['rank']) + 1
     df_f = pd.concat([df_r, df_a], sort=False).reset_index(drop=True)
-    return (df_f)
+    return df_f
 
+def visu_retirements_array(type_obs, obs_names, period_duration, n_market,graph_name = 'ex', color_mix = colors_22):
+    T, M = type_obs.shape
+
+    # 1) Somme de chaque colonne
+    col_sums = type_obs.sum(axis=0)
+
+    # 2) Indices des 23 plus grandes sommes
+    top23_idx = np.argsort(-col_sums)[:n_market+7]
+    # 3) Calcul arrival et initial_value (identique à ton code)
+    arrival = []
+    initial_value = []
+
+    for m in range(M):
+        first = None
+        for t in range(T):
+            if type_obs[t, m] > 0:
+                first = t
+                break
+        if first is None:
+            arrival.append(-1)
+            initial_value.append(0)
+        else:
+            arrival.append(first)
+            initial_value.append(type_obs[first, m])
+    is_top23 = np.zeros(M, dtype=bool)
+    is_top23[top23_idx] = True
+
+    cols_sorted = sorted(
+        range(M),
+        key=lambda m: (
+            not is_top23[m],  # priorité aux top23
+            -arrival[m],
+            initial_value[m]
+        )
+    )
+
+    rank = {m: k for k, m in enumerate(cols_sorted)}
+
+    # --- TRI SELON RANK ---
+    ordered_indices = sorted(
+        range(len(rank)),
+        key=lambda i: rank[i]
+    )
+
+    type_obs = type_obs[:, ordered_indices]
+    obs_names = [obs_names[i] for i in ordered_indices]
+
+    n_bars = type_obs.shape[0]
+    p_categories = type_obs.shape[1]
+
+    x = np.arange(n_bars) * period_duration + 2024
+    bottom = np.zeros(n_bars)
+    top = np.zeros(n_bars)
+    fig, ax = plt.subplots(figsize=(9, 6))
+    plt.grid(axis='y', color='grey', linestyle='--')
+    for i in range(p_categories):
+        top = top + type_obs[:, i]
+        if i < n_market+7:
+            ax.fill_between(x, bottom, top, label=obs_names[i],
+                                color=color_mix[i], linewidth=0, alpha=0.9)
+            bottom = top
+        # else :
+        #     ax.fill_between(x, bottom, top, linewidth=0, alpha=0.9)
+        #     bottom = top
+    ax.fill_between(x, bottom, top, alpha=0.9, color='grey', linewidth=0, edgecolor='white', label='Others', hatch='//')
+    ax.legend(framealpha=1, bbox_to_anchor=(1.05, 1),
+              loc='upper left', borderaxespad=0.)
+    plt.xlim(x.min(), x.max())
+    plt.ylim(0, 1.1 * top.max())
+    plt.xlabel('Years')
+    plt.ylabel('Retired aircraft seats')
+    plt.tight_layout()
+    plt.savefig('figures/integrated_scenario/' + graph_name+'_retir_mod.pdf')
+    plt.show()
+    return None

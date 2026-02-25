@@ -1,29 +1,22 @@
 import numpy as np
 import pandas as pd
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import os
-import seaborn as sns
-from matplotlib.animation import FuncAnimation
-from matplotlib.ticker import ScalarFormatter
-import matplotlib.colors as mcolors
 from PIL import Image
 import glob
-import time as tm
-from scipy.interpolate import interp1d
 from matplotlib.ticker import FuncFormatter
-from matplotlib.patches import Patch
-from matplotlib.lines import Line2D
-from matplotlib.patches import Rectangle
 import imageio.v2 as imageio
 import importlib
 from src.Common_tools import vis_ref
+import random as rd
 # importlib.reload(vis_ref)
 
 
 #The entry dataset can contain the following columns :
 # 'ADEP', 'ADEP Name',  'ADES', 'ADES Name', 'Period', 'Aircraft Type', 'Aircraft Type Name', 'Aircraft Operator','Aircraft Operator Name',
-# 'N_flights', 'Seats', 'ASK', 'Activity', 'Distance', 'Distance_conn (km)', 'Flights_conn_p',
+# 'N_flights', 'Seats', 'ASK', 'Activity','Av ac seats', 'Distance', 'Distance_conn (km)', 'Flights_conn_p',
 # 'Seats_conn_p', 'ASK_conn_p', 'Activity_conn_p', 'Weight'
 #The following module allows :
 # 1) to vizualize the market composition regarding aircraft operator or aircraft type depending on different indicators
@@ -84,7 +77,7 @@ def agg_ind_s(df, observation = 'ASK'):
 
 def market_vis(df, name_fig ='test_market', title_fig = None,  color_mix = vis_ref.colors_22, rank = None, color_rank =None,
                market = 'Aircraft Type', observation = 'ASK', dist_limits =(4e2, 1.9e4), capac_limits = (9e3, 4e6),
-                  ask_d_ref = None, m_x_ref = None, m_y_ref = None, video = False,
+                  ask_d_ref = None, m_x_ref = None, m_y_ref = None, video = False, fun_mode = False,
                   n_market = 12, reso = 400, smooth_param = 0.05, period_duration = 1, weight = False):
     #On peut étudier les flux par aéroport, opérateur, avion. Selon les ASKs, sieges ou nombre de vols
     #dimensions du graphe et du lissage
@@ -97,6 +90,9 @@ def market_vis(df, name_fig ='test_market', title_fig = None,  color_mix = vis_r
     smooth_x = (np.log(dist_limits[1]-np.log(dist_limits[0])))*smooth_param/(dimensions[0]*width_main/width_grid)
     smooth_y = (np.log(capac_limits[1]-np.log(capac_limits[0])))*smooth_param/(dimensions[1]*height_main/height_grid)
     fig = plt.figure(figsize=dimensions)
+    if fun_mode :
+        fig.patch.set_facecolor((color_mix[int(rd.random()*21)]))
+        fig.patch.set_alpha(0.2)  # Transparence if needed
     grid = plt.GridSpec(height_grid, width_grid, hspace=0.0, wspace=0.0)
     main_ax = fig.add_subplot(grid[height_grid-height_main:height_grid, 0:width_main])
     x_density_ax = fig.add_subplot(grid[0:height_grid-height_main, 0:width_main])
@@ -175,7 +171,7 @@ def market_vis(df, name_fig ='test_market', title_fig = None,  color_mix = vis_r
         (dist_limits[0] * (dist_limits[1] / dist_limits[0]) ** 0.33,
          capac_limits[0] * (capac_limits[1] / capac_limits[0]) ** 0.30),
         (dist_limits[0] * (dist_limits[1] / dist_limits[0]) ** 0.43,
-         capac_limits[0] * (capac_limits[1] / capac_limits[0]) ** 0.40),
+         capac_limits[0] * (capac_limits[1] / capac_limits[0]) ** 0.45),
         (dist_limits[0] * (dist_limits[1] / dist_limits[0]) ** 0.55,
          capac_limits[0] * (capac_limits[1] / capac_limits[0]) ** 0.55),
     ]
@@ -184,10 +180,11 @@ def market_vis(df, name_fig ='test_market', title_fig = None,  color_mix = vis_r
     for label in clabels1:
         label.set_bbox({'facecolor': 'none', 'alpha': 0.9, 'edgecolor': 'none'})
         label.set_text(label.get_text() + '%')
+    sizes_markers = (np.array(selec_0[observation]) / market_types[observation].sum())**0.6
     for j in range(len(Moys)):
         main_ax.scatter(Moys[j][0], Moys[j][1], alpha=1, marker='o',
-                        color=color_mix[color_rank[selec[j]]], s=250, linewidth=1, edgecolor='black', zorder=3)
-        main_ax.scatter(Moys[j][0], Moys[j][1], alpha=1, marker='+', s=250, color='0.05', zorder=3)
+                        color=color_mix[color_rank[selec[j]]], s=1100*sizes_markers[j], linewidth=1, edgecolor='black', zorder=3)
+        main_ax.scatter(Moys[j][0], Moys[j][1], alpha=1, marker='+', s=1100*sizes_markers[j], color='0.05', zorder=3)
     main_ax.set_xlabel('Route distance (km)', fontsize=17, color='darkblue')
     main_ax.set_ylabel('Route capacity (seats/year)', fontsize=17, color='darkred')
     main_ax.set_xscale('log')
@@ -285,7 +282,7 @@ def market_vis(df, name_fig ='test_market', title_fig = None,  color_mix = vis_r
         )
     if title_fig is not None:
         fig.suptitle(title_fig, fontsize=18, fontweight='bold', y=0.95, x = 0.3, ha = 'left')
-    if video == True :
+    if video:
         plt.savefig('figures/video_storage/'+name_fig+'.png', format = 'png')
     else :
         plt.savefig('figures/assignment_figures/'+name_fig+'.pdf', format = 'pdf')
@@ -443,8 +440,8 @@ def assign_vis(df, market_seg, name_fig ='test_assign', title_fig = None, market
     return None
 
 def dynamic_market_vis(df, periods, name_periods = None, video_name = 'test_video_market', format_v = 'gif', color_mix = vis_ref.colors_22, market = 'Aircraft Type',
-                    observation = 'ASK', dist_limits = (4e2, 1.9e4), capac_limits = (9e3, 4e6), frame_s = 2,
-                    period_ref = None, n_market = 12, reso = 400, smooth_param = 0.05, period_duration = 1, weight = False):
+                    observation = 'ASK', dist_limits = (4e2, 1.9e4), capac_limits = (9e3, 4e6), frame_s = 2, period_ref = None, n_market = 12,
+                       reso = 400, smooth_param = 0.05, period_duration = 1, weight = False, type_obs = None, obs_names = None):
     selec_df = df[df['Period'].isin(periods)]
     if name_periods is None:
        name_periods = periods
@@ -462,10 +459,14 @@ def dynamic_market_vis(df, periods, name_periods = None, video_name = 'test_vide
 
     # Ordonnancement des couleurs
     Lists_c = []
+    Lists_r = []
     for period in periods:
         df_p = selec_df[selec_df['Period'] == period]
-        market_types = df_p[[market, market + ' Name', observation]].groupby([market, market + ' Name']).sum().sort_values(by=observation, ascending=False).reset_index()
+        group = df_p[[market,  observation]].groupby([market]).sum().sort_values(by=market, ascending=False)
+        market_types = group.sort_values(by=observation, ascending=False).reset_index()
         selec = market_types[:n_market][market]
+        selec_r = market_types[market]
+        Lists_r.append(list(selec_r))
         Lists_c.append(list(selec))
     sol = vis_ref.color_lists(Lists_c)
     if sol is not None:
@@ -476,7 +477,7 @@ def dynamic_market_vis(df, periods, name_periods = None, video_name = 'test_vide
     #Ordonnancement des markets pour des transitions smooth entre avions ou opérateurs
     first = {}
     last = {}
-    for i, list_m in enumerate(Lists_c):
+    for i, list_m in enumerate(Lists_r):
         for m in list_m :
             if m not in first:
                 first[m] = i
@@ -497,7 +498,7 @@ def dynamic_market_vis(df, periods, name_periods = None, video_name = 'test_vide
                 subset=['ADES', 'ADEP'], keep='first')[
                 list({'Distance_conn (km)', 'Seats_conn_p', observation + '_conn_p', 'Weight'})]
             traff_matrix, x, y = vis_ref.smooth_ln_2d(np.array(int_traff['Distance_conn (km)']),
-                                                      np.array(int_traff['Seats_conn_p']) / period_duration,
+                                                      np.array(int_traff['Seats_conn_p']),
                                                       np.array(int_traff[observation + '_conn_p'])*np.array(int_traff['Weight']), dist_limits,
                                                       capac_limits, reso,
                                                       smooth_x, smooth_y)
@@ -505,7 +506,7 @@ def dynamic_market_vis(df, periods, name_periods = None, video_name = 'test_vide
             int_traff = df_p[list({'ADEP', 'ADES', 'Distance_conn (km)', 'Seats_conn_p', observation + '_conn_p'})].drop_duplicates(
                 subset=['ADES', 'ADEP'], keep='first')[list({'Distance_conn (km)', 'Seats_conn_p', observation + '_conn_p'})]
             traff_matrix, x, y = vis_ref.smooth_ln_2d(np.array(int_traff['Distance_conn (km)']),
-                                                      np.array(int_traff['Seats_conn_p']) / period_duration,
+                                                      np.array(int_traff['Seats_conn_p']),
                                                       np.array(int_traff[observation + '_conn_p']), dist_limits,
                                                       capac_limits, reso,
                                                       smooth_x, smooth_y)
@@ -513,7 +514,6 @@ def dynamic_market_vis(df, periods, name_periods = None, video_name = 'test_vide
         ask_max = traff_matrix.max()
         traff_x_max = traff_matrix.sum(axis = 0).max()*1.05
         traff_y_max = traff_matrix.sum(axis=1).max()*1.2
-
     selec_df = df[df['Period'].isin(periods)]
     #nettoyage des images existantes
     for filename in os.listdir('figures/video_storage/'):
@@ -522,16 +522,16 @@ def dynamic_market_vis(df, periods, name_periods = None, video_name = 'test_vide
     #Créations des images
     for i in range(len(periods)):
         if i%3 == 0 :
-            print(str(100*i/len(periods))+'%')
+            print(str(int(1000*i/len(periods)+0.5)/10)+'%')
         market_vis(selec_df[selec_df['Period'] == periods[i]],name_fig ='video_'+str(100+i), color_mix = color_mix, rank = rank, color_rank = sol,
                    market = market, observation = observation, dist_limits = dist_limits, capac_limits = capac_limits, n_market = n_market,
                    m_x_ref= traff_x_max, m_y_ref = traff_y_max, ask_d_ref = ask_max, video = True, title_fig = name_periods[i],
-                    smooth_param = smooth_param, period_duration = period_duration, weight = weight, reso = reso)
+                    smooth_param = smooth_param, weight = weight, reso = reso)
 
-    # Animation des images
+    #Animation des images
     image_files = sorted(glob.glob("figures/video_storage/*.png"))
     if format_v == 'video':
-        with imageio.get_writer('figures/'+video_name + '.mp4', fps=frame_s) as writer:
+        with imageio.get_writer('figures/integrated_scenario/'+video_name + '.mp4', fps=frame_s) as writer:
             # répéter la première image 3 fois
             for _ in range(6):
                 writer.append_data(imageio.imread(image_files[0]))
@@ -548,9 +548,59 @@ def dynamic_market_vis(df, periods, name_periods = None, video_name = 'test_vide
         # Charger les images
         frames = [Image.open(img) for img in image_files]
         # Sauvegarder en GIF animé
-        frames[0].save('figures/'+ video_name + '.gif', save_all=True,
+        frames[0].save('figures/integrated_scenario/'+ video_name + '.gif', save_all=True,
                        append_images=[frames[0] for i in range(3)] + frames[:] + [frames[-1] for i in range(3)],
                        duration=1000/frame_s, loop=0)
+    if type_obs is not None:
+        type_obs = np.array(type_obs)
+        print(rank)
+        # --- TRI SELON RANK ---
+        # ordered_indices = sorted(
+        #     range(len(rank)),
+        #     key=lambda i: rank[i]
+        # ) #on teste autre chose
+        ordered_indices = sorted(
+            rank.keys(),
+            key=lambda i: rank[i]
+        )
+
+
+        type_obs = type_obs[:, ordered_indices]
+        obs_names = [obs_names[i] for i in ordered_indices]
+
+        n_bars = type_obs.shape[0]
+        p_categories = type_obs.shape[1]
+
+
+
+        x = np.arange(n_bars) * period_duration + 2024
+        bottom = np.zeros(n_bars)
+        top = np.zeros(n_bars)
+        fig, ax = plt.subplots(figsize=(9,6))
+        plt.grid(axis='y', color='grey', linestyle='--')
+
+        for i in range(p_categories):
+            top = top + type_obs[:, i]
+            if i < n_market+7:
+                if ordered_indices[i] in sol :
+                    ax.fill_between(x,bottom,top,label=obs_names[i],
+                        color = color_mix[sol[ordered_indices[i]]],linewidth = 0,alpha=0.9)
+                else :
+                    ax.fill_between(x,bottom,top,label=obs_names[i],
+                        linewidth=0,alpha=0.9)
+                bottom = top
+        mpl.rcParams['hatch.color'] = 'white'
+        ax.fill_between(x,bottom,top,alpha=0.9, color='grey',linewidth = 0, edgecolor='white', label = 'Others',hatch='//')
+        ax.legend(framealpha=1,bbox_to_anchor=(1.05, 1),
+                  loc='upper left',borderaxespad=0.)
+        plt.xlim(x.min(), x.max())
+        plt.ylim(0, 1.1*top.max())
+        plt.xlabel('Years')
+        plt.ylabel('Quantity of ' + observation)
+        plt.tight_layout()
+        plt.savefig('figures/integrated_scenario/'+video_name + '.pdf')
+        plt.show()
+
     return None
 
 def dynamic_assign_vis(df, market_seg, periods, name_periods = None, video_name = 'test_video_assign', format_v = 'gif', market ='Aircraft Type',

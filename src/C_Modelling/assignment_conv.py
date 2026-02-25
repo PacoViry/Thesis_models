@@ -9,14 +9,13 @@ def fuel_consumptions(fuel_efficiencies, utilisation_profiles):
 def conv_assignt(conn_data, existence_cache, alphas, betas, omegas_p, ranges, constraints, indices, speed = 1.01,  epsilon = 0.0001):
     omegas = omegas_p.copy()
     #loop
-    diffs =np.array(1)
+    diffs =np.array(1)*existence_cache[indices,0]
     while np.abs(diffs).max() > epsilon:
-        pots = am.predict_assignt(conn_data, existence_cache, alphas, betas, omegas, ranges, d_norm =1, cap_norm = 1)
+        pots = am.predict_assignt(conn_data, existence_cache, alphas, betas, omegas, ranges, d_norm =1, cap_norm = 1, single_p = True)
         ass_mod = pots[indices, :] * conn_data[:, 3][np.newaxis, :]
         ass_const = ass_mod.sum(axis=1)
-        diffs = np.log(constraints) - np.log(ass_const[indices])
+        diffs = (np.log(constraints) - np.log(ass_const))*existence_cache[indices,0]
         omegas[indices]+= speed*diffs[:, np.newaxis]
-
     return omegas
 
 def range_distance(pots, conn_data, ranges):

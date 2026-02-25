@@ -21,14 +21,18 @@ importlib.reload(vis_ref)
 #3) To connect aircraft caracteristics and assignment coefficients.
 
 
-def data_formatting(df, seuils_f = 0.01, n_ac = 60, obs = 'ASK', weight = True, save_techn_carac = False):
+def data_formatting(df, seuils_f = 0.01, n_ac = 60, obs = 'ASK', weight = True, save_techn_carac = False, airports = False):
+    if airports :
+        add = ['ADES', 'ADEP']
+    else :
+        add = []
     if weight:
         df[obs+'_w'] = df[obs] * df['Weight'] #eventuellement le formuler en activité
     else :
         df[obs+'_w'] = df[obs]
     ac_types = df[['Aircraft Type','Aircraft Type Name', obs+'_w']].groupby(['Aircraft Type','Aircraft Type Name']).sum().reset_index().sort_values(by=obs+'_w',ascending=False)
     selec = ac_types[:n_ac]
-    n_y = (df['Period'].max() - df['Period'].min()).astype(int)
+    n_y = int((df['Period'].max() - df['Period'].min()))+1
     print(str(int(1000*selec[obs+'_w'].sum()/ac_types[obs+'_w'].sum())/10)+'% '+obs+'s selected.')
     df_f1 = df[df['Aircraft Type'].isin(selec['Aircraft Type'])]
     l_dist = []
@@ -61,22 +65,30 @@ def data_formatting(df, seuils_f = 0.01, n_ac = 60, obs = 'ASK', weight = True, 
     #volumes modeled per connection (used for validation)
 
     obs_conn_p = (
-        df_f2.groupby(['Period','Distance_conn (km)', 'Seats_conn_p',obs+'_conn_p'])[obs+'_w']
+        df_f2.groupby(add+['Period','Distance_conn (km)', 'Seats_conn_p',obs+'_conn_p'])[obs+'_w']
         .sum()
         .reset_index()
         .rename(columns={obs+'_w': obs+'_w_mod'})
     )
-    conn = df_f2.drop_duplicates(subset=['Period', 'Distance_conn (km)', 'Seats_conn_p', obs+'_conn_p'])[
-        ['Period', 'Distance_conn (km)', 'Seats_conn_p', obs+'_conn_p']]
+    conn = df_f2.drop_duplicates(subset=add+['Period', 'Distance_conn (km)', 'Seats_conn_p', obs+'_conn_p'])[
+        add+['Period', 'Distance_conn (km)', 'Seats_conn_p', obs+'_conn_p']]
 
     conn = pd.merge(conn,obs_conn_p,
-    on=['Period','Distance_conn (km)', 'Seats_conn_p',obs+'_conn_p'],
+    on=add+['Period','Distance_conn (km)', 'Seats_conn_p',obs+'_conn_p'],
     how='left')
     #aircraft presence cache for the regression
     contingency_table = pd.crosstab(df_f2['Id_mod'], df_f2['Period'])
+    #deux lignes suivantes pour éviter des problèmes quand on saute le covid)
+    all_periods = range(df_f2['Period'].min(),
+                        df_f2['Period'].max() + 1)
+
+    contingency_table = contingency_table.reindex(
+        columns=all_periods,
+        fill_value=0
+    )
     binary_table = (contingency_table > 0).astype(int)
     aircraft_existence_cache = np.array(binary_table)
-    return df_f2[['Period', 'Distance_conn (km)', 'Seats_conn_p', obs+'_conn_p', 'Id_mod', obs + '_w']], corr_table, aircraft_existence_cache, max_dist, conn
+    return df_f2[add+['Period', 'Distance_conn (km)', 'Seats_conn_p', obs+'_conn_p', 'Id_mod', obs + '_w']], corr_table, aircraft_existence_cache, max_dist, conn
 
 def log_likelihood_1_0(data_batch, cache, alphas, betas, omegas, ranges):
     us = (alphas[:, None] * data_batch[:, 1] + betas[:, None] * data_batch[:, 2]) + omegas[
@@ -218,20 +230,27 @@ def correspondance_table(title_coeffs = 'logit_model_bts_35_5_1_9',title_tech = 
     tech_table = pd.read_excel(excel_path_tech, index_col=0)[
         ['Aircraft Type Name', obs_choice + '_weight', 'Est_avg_seats', 'Est_max_range']].set_index(
         'Aircraft Type Name')
+    tech_table['Aircraft Type Name'] = tech_table.index
     data_table = pd.merge(tech_table, coeffs, left_index=True, right_index=True)
     # p_min = int(np.log10(data_table[obs_choice + '_weight'].min())) #Pour normaliser, ici on l'enlève pour avoir une estimation réaliste pour le nombre d'avion neufs équivalents.
     # data_table[obs_choice + '_weight'] = data_table[obs_choice + '_weight'] / 10 ** p_min
     return data_table
 
-def predict_assignt(conn_data, existence_cache, alphas, betas, omegas, ranges, d_norm = 15000, cap_norm = 15):
+def predict_assignt(conn_data, existence_cache, alphas, betas, omegas, ranges, d_norm = 15000, cap_norm = 15, single_p = False):
     c_data = conn_data.copy()
     c_data[:, 1] = c_data[:, 1] / d_norm
     c_data[:, 2] = np.log(c_data[:, 2]) / cap_norm
     ranges_b = ranges.copy()/d_norm
-    us = alphas.reshape(-1, 1) * c_data[:, 1] + betas.reshape(-1, 1) * c_data[:, 2] + omegas[
-        :, c_data[:, 0].astype(int)]
-    pots = (ranges_b.reshape(-1, 1) >= c_data[:, 1].reshape(1, -1)) * (
-    existence_cache[:, c_data[:, 0].astype(int)]) * np.exp(us)
+    if single_p :
+        us = alphas.reshape(-1, 1) * c_data[:, 1] + betas.reshape(-1, 1) * c_data[:, 2] + omegas[
+            :, 0][:, np.newaxis]
+        pots = (ranges_b.reshape(-1, 1) >= c_data[:, 1].reshape(1, -1)) * (
+            existence_cache[:, 0][:, np.newaxis]) * np.exp(us)
+    else :
+        us = alphas.reshape(-1, 1) * c_data[:, 1] + betas.reshape(-1, 1) * c_data[:, 2] + omegas[
+            :, c_data[:, 0].astype(int)]
+        pots = (ranges_b.reshape(-1, 1) >= c_data[:, 1].reshape(1, -1)) * (
+        existence_cache[:, c_data[:, 0].astype(int)]) * np.exp(us)
     pots = pots / pots.sum(axis=0)
     return pots
 
@@ -353,55 +372,68 @@ def visu_coeffs(alphas, betas, names_ac,ds_name, d_norm = 1, cap_norm = 1):
     plt.savefig('figures//estimators_figures//estim_model_' +ds_name+'.pdf', bbox_inches="tight", format='pdf')
     plt.show()
 
-def regressor_assign_coeffs(c_table, weight = False, obs_choice = 'ASK'):
+def regressor_assign_coeffs(c_table, weight = False, weight_log = False, obs_choice = 'ASK', visu = True):
     x_0 = c_table[['Est_max_range','Est_avg_seats']]
     x = np.concatenate((x_0, np.log(x_0), 1 / x_0), axis=1)
 
 
-    y1 = c_table['alphas']
+    y1 = c_table['alphas'] #variable with heteroscedasticity. Problématic in our case. We try here to weight with the log (optionnal)
     y2 = c_table['betas']
     if weight :
-        weight_c = c_table[obs_choice + '_weight']
+        p_max = int(np.log10(c_table[obs_choice + '_weight'].max()))
+        weight_c2 = c_table[obs_choice + '_weight']/10**(p_max-2)
+        if weight_log :
+            d_min=c_table['Est_max_range'].min()
+            weight_c1 = weight_c2*np.log1p(c_table['Est_max_range'].values/d_min)
+        else :
+            weight_c1 = weight_c2
     else :
-        weight_c = 25*np.ones(len(y1))
+        weight_c2 = 25*np.ones(len(y1))
+        if weight_log :
+            d_min=c_table['Est_max_range'].min()
+            weight_c1 = weight_c2*np.log1p(c_table['Est_max_range'].values/d_min)
+        else :
+            weight_c1 = weight_c2
 
     model1 = LinearRegression()
-    model1.fit(x, y1, sample_weight=weight_c)
-    y_pred = model1.predict(x)
-    mse = mean_squared_error(y1, y_pred,sample_weight=weight_c)
-    r2 = r2_score(y1, y_pred,sample_weight=weight_c)
+    model1.fit(x, y1, sample_weight=weight_c1)
 
-    print(f"MSE : {10**8*mse:.3f}e-8")
-    print(f"R^2 : {r2:.3f}")
-    plt.scatter(y_pred, y1, color='blue', alpha=0.8, label='Aircraft type', s=weight_c)
-    plt.plot([min(y1), max(y1)], [min(y1), max(y1)], color='red', linestyle='--', label='y = x')
-    plt.ylabel(r'$\alpha_j$: Real assignment parameter', fontsize=16)
-    plt.xlabel(r'$\hat{\alpha_j}$: Predicted assignment parameter', fontsize=16)
-    plt.legend(fontsize=18, framealpha=1)
-    plt.grid(True)
-    plt.show()
+    if visu :
+        y_pred = model1.predict(x)
+        mse = mean_squared_error(y1, y_pred, sample_weight=weight_c1)
+        r2 = r2_score(y1, y_pred, sample_weight=weight_c1)
+        print(f"MSE : {10 ** 8 * mse:.3f}e-8")
+        print(f"R^2 : {r2:.3f}")
+        plt.scatter(y_pred, y1, color='blue', alpha=0.8, label='Aircraft type', s=weight_c1)
+        plt.plot([min(y1), max(y1)], [min(y1), max(y1)], color='red', linestyle='--', label='y = x')
+        plt.ylabel(r'$\alpha_j$: Real assignment parameter', fontsize=16)
+        plt.xlabel(r'$\hat{\alpha_j}$: Predicted assignment parameter', fontsize=16)
+        plt.legend(fontsize=18, framealpha=1)
+        plt.grid(True)
+        plt.show()
 
     model2 = LinearRegression()
-    model2.fit(x, y2, sample_weight=weight_c)
-    y_pred = model2.predict(x)
-    mse = mean_squared_error(y2, y_pred, sample_weight=weight_c)
-    r2 = r2_score(y2, y_pred, sample_weight=weight_c)
+    model2.fit(x, y2, sample_weight=weight_c2)
 
-    print(f"MSE : {10*mse:.3f}e-1")
-    print(f"R^2 : {r2:.3f}")
-    plt.scatter(y_pred, y2, color='blue', alpha=0.8, label='Aircraft type', s=weight_c)
-    plt.plot([min(y2), max(y2)], [min(y2), max(y2)], color='red', linestyle='--', label='y = x')
-    plt.ylabel(r'$\beta_j$: Real assignment parameter', fontsize=16)
-    plt.xlabel(r'$\hat{\beta_j}$: Predicted assignment parameter', fontsize=16)
-    plt.legend(fontsize=18, framealpha=1)
-    plt.grid(True)
-    plt.show()
+    if visu :
+        y_pred = model2.predict(x)
+        mse = mean_squared_error(y2, y_pred, sample_weight=weight_c2)
+        r2 = r2_score(y2, y_pred, sample_weight=weight_c2)
+        print(f"MSE : {10 * mse:.3f}e-1")
+        print(f"R^2 : {r2:.3f}")
+        plt.scatter(y_pred, y2, color='blue', alpha=0.8, label='Aircraft type', s=weight_c2)
+        plt.plot([min(y2), max(y2)], [min(y2), max(y2)], color='red', linestyle='--', label='y = x')
+        plt.ylabel(r'$\beta_j$: Real assignment parameter', fontsize=16)
+        plt.xlabel(r'$\hat{\beta_j}$: Predicted assignment parameter', fontsize=16)
+        plt.legend(fontsize=18, framealpha=1)
+        plt.grid(True)
+        plt.show()
     return np.concatenate([np.array([model1.intercept_]),model1.coef_]), np.concatenate([np.array([model2.intercept_]),model2.coef_])
 
 def regressor_visu_model(c_table, alphas_coeff, betas_coeff, reg_name='test'):
     y1 = c_table['alphas']
     y2 = c_table['betas']
-    names_ac = c_table.index
+    names_ac = c_table['Aircraft Type Name'].to_list()
     plt.figure(figsize=(5.5, 5.5))
     plt.grid(True, linestyle='--', linewidth=0.3, color='gray')
     p_d = 20
@@ -490,9 +522,9 @@ def regressor_visu_model(c_table, alphas_coeff, betas_coeff, reg_name='test'):
     plt.gca().xaxis.get_major_formatter().set_powerlimits((-1, 1))
     plt.xlabel('Impact of distance', fontsize=14)
     plt.ylabel('Impact of log(capacity)', fontsize=14)
-    plt.savefig('figures//estmators_figures//visu_regressor_' + reg_name + '.pdf', bbox_inches="tight", format='pdf')
+    plt.savefig('figures//estimators_figures//visu_regressor_' + reg_name + '.pdf', bbox_inches="tight", format='pdf')
     plt.show()
 
 def assign_coeffs_pred(alphas_coeff, betas_coeff,seats_ac, range_ac):
     x = np.array([range_ac, seats_ac,np.log(range_ac), np.log(seats_ac), 1 / range_ac, 1 / seats_ac])
-    return alphas_coeff[0]+ (x*alphas_coeff[1:]).sum(), betas_coeff[0]+ (x*betas_coeff[1:]).sum()
+    return alphas_coeff[0]+ (x*alphas_coeff[1:]).sum(), betas_coeff[0]+ (x*betas_coeff[1:]).sum(),seats_ac, range_ac

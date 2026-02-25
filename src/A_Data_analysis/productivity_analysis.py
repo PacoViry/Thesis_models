@@ -123,7 +123,7 @@ def GT_density(df, name_fig = 'test_GT_density', GT_min = 0.2,GT_max = 24, FT_mi
         fontsize=13 + 2,  # Taille de la police
         color='fuchsia'  # Couleur des annotations
     )
-    plt.plot(np.linspace(0.5, 5.5, 25), np.linspace(22, 12, 25), linewidth=3, linestyle='--', color='lime')
+    plt.plot(np.linspace(FT_min, 5.5, 25), np.linspace(23-2*FT_min, 12, 25), linewidth=3, linestyle='--', color='lime')
     plt.annotate(
         'Daily "back and forth" 1h stop',  # Le label à afficher
         (3, 15),  # Position (valeur réelle, prédiction)
@@ -133,7 +133,7 @@ def GT_density(df, name_fig = 'test_GT_density', GT_min = 0.2,GT_max = 24, FT_mi
         color="lime"  # Couleur des annotations
         , rotation=-angle
     )
-    plt.plot(np.linspace(0.5, 5.5, 25), np.linspace(1, 1, 25), linewidth=3, linestyle='--', color='black')
+    plt.plot(np.linspace(FT_min, 5.5, 25), np.linspace(1, 1, 25), linewidth=3, linestyle='--', color='black')
     plt.annotate(
         'TAT = 1h',  # Le label à afficher
         (1.5, 1.3),  # Position (valeur réelle, prédiction)
@@ -272,8 +272,8 @@ def TATs_matrix(df, name_fig = 'test', x_min = 0.5,x_max = 14, y_min = 0.5, y_ma
         plt.xticks(x_ticks, [str(u) for u in x_ticks], fontsize=12)
         plt.yticks(y_ticks, [str(u) for u in y_ticks], fontsize=12)
 
-    plt.xlabel('Average duration of back and forth serie N (h)', fontsize=14)
-    plt.ylabel('Average duration of back and forth serie N+1 (h)', fontsize=14)
+    plt.xlabel('Average BT of back and forth serie N (h)', fontsize=14)
+    plt.ylabel('Average BT of back and forth serie N+1 (h)', fontsize=14)
     ax = plt.gca()
     ax.xaxis.set_major_locator(FixedLocator(x_ticks))
     ax.yaxis.set_major_locator(FixedLocator(y_ticks))
@@ -324,8 +324,8 @@ def TATs_matrix(df, name_fig = 'test', x_min = 0.5,x_max = 14, y_min = 0.5, y_ma
         plt.xticks(x_ticks, [str(u) for u in x_ticks], fontsize=12)
         plt.yticks(y_ticks, [str(u) for u in y_ticks], fontsize=12)
 
-    plt.xlabel('Average duration of back and forth serie N (h)', fontsize=14)
-    plt.ylabel('Average duration of back and forth serie N+1 (h)', fontsize=14)
+    plt.xlabel('Average BT of back and forth serie N (h)', fontsize=14)
+    plt.ylabel('Average BT of back and forth serie N+1 (h)', fontsize=14)
     ax = plt.gca()
     ax.xaxis.set_major_locator(FixedLocator(x_ticks))
     ax.yaxis.set_major_locator(FixedLocator(y_ticks))
@@ -444,18 +444,20 @@ def visu_distrib(exemple, sigma = 0.8, titre = 'ac_fh_distrib', visu = False, vi
     x_min = distribution.argmin()
     y_min = distribution.min()
     if visu:
-        sns.set(style='whitegrid')
+        sns.set_style('whitegrid')
         plt.figure(figsize=(9, 2.5))  # Adjusted figure size
         if visu_c:
             distribution2 = heures_en_vol(exemple['FILED OFF BLOCK TIME'], exemple['FILED ARRIVAL TIME'], 0.0005, res_minutes=1)
             plt.plot(distribution2.index, distribution2.values, label='raw data')
             plt.plot(distribution.index, distribution.values, label='smoothed data')
-            plt.scatter(x_min*1/60, y_min, color='red', label='reference hour', zorder=3)
+            plt.scatter(x_min*1/60, y_min, color='red', zorder=3, s = 30)
+            plt.scatter(x_min * 1 / 60, 0, color='red', zorder=3, marker ='*', label=r'$t_{inac}$',clip_on=False, s = 90)
+            plt.plot([x_min*1/60,x_min*1/60], [0,y_min], color='red', linestyle = '--', linewidth = 1, zorder=3)
         else:
             plt.plot(distribution.index, distribution.values)
-        plt.legend(loc='best', framealpha = 1)  # Adjusted legend position
-        plt.xlabel("Hour of the day")
-        plt.ylabel("Flights occuring")
+        plt.legend(loc='best', framealpha = 1, fontsize = 13)  # Adjusted legend position
+        plt.xlabel("Hour of the day", fontsize=14)
+        plt.ylabel("Flights occuring", fontsize=14)
         plt.grid(True)
         plt.xlim([distribution.index.min(), distribution.index.max()])  # Set x-axis limits
         plt.ylim([0, distribution.values.max() * 1.1])  # Set y-axis limits
@@ -518,7 +520,6 @@ def constru_series_vols(exemple, x_min):
 
     # Identifier les séries d’intervalles consécutifs non vides
     active = n_vols > 0
-    series_id = np.cumsum((~active).astype(int))
     # Calcul de la durée totale de chaque série (somme des n_days)
 
     # Attribution aux vols
@@ -536,10 +537,10 @@ def constru_series_vols(exemple, x_min):
     mask = (pos < ref_times_np.size) & (ref_times_np[pos] < arr_valid)
     cuts_ref[mask] = 1
 
-    tableau_vols = np.column_stack((
-        durations_valid,
+    tableau_vols = np.column_stack(( #+0.1 jsute pour l'adaptation
+        durations_valid+0.1,
         taille_groupe,
-        duree_moyenne_groupe,
+        duree_moyenne_groupe+0.1,
         series_duration_days,
         cuts_ref
     ))

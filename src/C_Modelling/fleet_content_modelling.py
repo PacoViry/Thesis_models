@@ -20,7 +20,8 @@ def fleet_content(a, b, fleet_obs_t, retirement_coeffs, constraint, epsilon=0.00
     fleets = ((a+b)/2)**(np.exp(-retirement_coeffs)) * fleet_obs_t
     e = (fleets.sum().sum() - constraint)/constraint
     # print('power: '+str((a+b)/2) + ' constraint: '+str(constraint) + ' '+str(fleets.sum().sum())+' error: '+str(np.abs(e)))
-
+    if b==0:
+        print('reso bug')
     if np.abs(e) < epsilon:
         return fleets, (a+b)/2
     elif e > 0:

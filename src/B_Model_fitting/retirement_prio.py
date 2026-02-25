@@ -12,59 +12,21 @@ import seaborn as sns
 
 
 def setting_df(ac_df):
-    Liste_classements = ac_df['rank'].unique()
+    list_ranks = ac_df['rank'].unique()
     # Séparer les lignes où 'C' vaut 'a' et 'b'
-    filter = ac_df['rank'] == Liste_classements[-1]
-    df_a = ac_df[~filter]
-    df_b = ac_df[filter]
+    filter = ac_df['rank'] == list_ranks[-1]
+    df_r = ac_df[~filter]
+    df_a = ac_df[filter]
 
-    df_a['Type_Year'] = df_a['Aircraft Type'] +' '+ df_a['Delivery Date'].astype(int).astype(str)
-    df_b['Type_Year'] = df_b['Aircraft Type'] +' '+ df_b['Delivery Date'].astype(int).astype(str)
+    df_r['Type_Year'] = df_r['Aircraft Type'].astype(str) +' '+ df_r['Delivery Date'].astype(int).astype(str)
+    df_a['Type_Year'] = df_a['Aircraft Type'].astype(str) +' '+ df_a['Delivery Date'].astype(int).astype(str)
 
-    df_b_filtered = df_b[df_b['Type_Year'].isin(df_a['Type_Year'].unique())]
-
+    df_a_filtered = df_a[df_a['Type_Year'].isin(df_r['Type_Year'].unique())]
+    # df_b_filtered = df_b.copy() #on pose des problèmes sur la convergence.
     # Fusionner les DataFrames pour obtenir le résultat final
-    file_f = pd.concat([df_a, df_b_filtered])
+    file_f = pd.concat([df_r, df_a_filtered])
     file_f.reset_index(inplace= True, drop=True)
-    return(file_f)
-
-
-def random_list(liste_r, params):
-    year_min = liste_r['Delivery Date'].min()
-    year_max = liste_r['Delivery Date'].max()
-    liste_modeles = sorted(liste_r['Aircraft Type'].unique())
-    propensions = ini_propensions(params)
-    classements = liste_r['rank'].unique()
-    lignes = []
-    l_e = liste_r[liste_r['rank'] <= classements[-1]][['Aircraft Type', 'Delivery Date', 'rank']]
-    for c in classements[:-1]:
-        extract = l_e[l_e['rank'] == c]
-        N = extract.shape[0]
-        if N > 1:
-            pivot_table = extract[['Aircraft Type', 'Delivery Date', 'rank']].pivot_table(values='rank',
-                                                                                       index='Aircraft Type',
-                                                                                       columns='Delivery Date',
-                                                                                       aggfunc='count', fill_value=0)
-            pivot_table = pivot_table.reindex(index=liste_modeles, columns=list(range(year_min, year_max + 1)),
-                                              fill_value=0)
-            flotte = pivot_table.to_numpy()
-            probas1 = propensions * flotte  ###on teste pour voir si ça bugue pas et si on fait mieux que 94s
-            s = probas1.shape
-            for i in range(N):  ### tirage simplifié ici, à améliorer et réfléchir
-                probas2 = probas1 / probas1.sum()
-                probas_cum = probas2.cumsum()
-                tirage = rd.random()
-                modele, date = np.unravel_index(np.argmax(probas_cum >= tirage), s)
-                probas1[modele, date] += -propensions[modele, date]
-                lignes.append([liste_modeles[modele], date + year_min, 1])
-        else:
-            lignes.append(extract.iloc[0].tolist())
-    nouveau_df = pd.DataFrame(lignes, columns=['Aircraft Type', 'Delivery Date', 'rank'])
-    nouveau_df['rank'] = nouveau_df.index + 1
-    nouveau_df = pd.concat([nouveau_df, liste_r[liste_r['rank'] == classements[-1]]], sort=False)
-    nouveau_df = nouveau_df.reset_index(drop=True)
-    return (nouveau_df)
-
+    return file_f
 
 def heatmap_retirements(liste, n = 480, ymin = 0):
     resultats = np.zeros((n + 10, n + 10))
@@ -96,87 +58,140 @@ def heatmap_retirements(liste, n = 480, ymin = 0):
     plt.show()
     return None
 
+
+def random_list(liste_r, params):
+    n_ac = params.shape[0]
+    list_ac = np.arange(n_ac)
+    list_dates = sorted(liste_r['Delivery Date'].unique())
+    propensions = ini_propensions(params)
+    classements = liste_r['rank'].unique()
+    lignes = []
+    l_e = liste_r[liste_r['rank'] <= classements[-1]][['Aircraft Type', 'Delivery Date', 'rank']]
+    for c in classements[:-1]:
+        extract = l_e[l_e['rank'] == c]
+        n_r = extract.shape[0]
+        if n_r > 1:
+            pivot_table = (extract[['Aircraft Type', 'Delivery Date', 'rank']].pivot_table(values='rank',
+                                                                                          index='Aircraft Type',
+                                                                                          columns='Delivery Date',
+                                                                                          aggfunc='count',
+                                                                                          fill_value=0)
+                           .reindex(index=list_ac, columns=list_dates, fill_value=0))
+            pivot_table.sort_index(axis=0, inplace=True)
+            pivot_table.sort_index(axis=1, inplace=True)
+            flotte = pivot_table.to_numpy()
+            s = propensions.shape
+            probas1 = propensions * flotte  ###on teste pour voir si ça bugue pas et si on fait mieux que 94s
+            for i in range(n_r):  ### tirage simplifié ici, à améliorer et réfléchir
+                probas2 = probas1 / probas1.sum()
+                probas_cum = probas2.cumsum()
+                tirage = rd.random()
+                modele, date = np.unravel_index(np.argmax(probas_cum >= tirage), s)
+                probas1[modele, date] += -propensions[modele, date]
+                lignes.append([list_ac[modele], list_dates[date], c+i])
+        else:
+            lignes.append(extract.iloc[0].tolist())
+    nouveau_df = pd.DataFrame(lignes, columns=['Aircraft Type', 'Delivery Date', 'rank'])
+    nouveau_df['rank'] = nouveau_df.index + 1
+    nouveau_df = pd.concat([nouveau_df, liste_r[liste_r['rank'] == classements[-1]]], sort=False)
+    nouveau_df = nouveau_df.reset_index(drop=True)
+    return nouveau_df
+
 def ini_propensions(params):
     propensions = np.exp(-params)
     return (propensions)
 
-
 def grad_minibatch(liste_r, params):  # mode 0, classique
-    year_min = liste_r['Delivery Date'].min()
-    year_max = liste_r['Delivery Date'].max()
+    n_ac = params.shape[0]
+    list_ac = np.arange(n_ac)
+    list_dates = sorted(liste_r['Delivery Date'].unique())
     classements = liste_r['rank'].unique()[:-1]
-
-    liste_modeles = sorted(liste_r['Aircraft Type'].unique())
     propensions = ini_propensions(params)
 
-    pivot_table = liste_r[['Aircraft Type', 'Delivery Date', 'rank']].pivot_table(values='rank', index='Aircraft Type',
-                                                                               columns='Delivery Date', aggfunc='count',
-                                                                               fill_value=0)
-    pivot_table = pivot_table.reindex(index=liste_modeles, columns=list(range(year_min, year_max + 1)), fill_value=0)
-    flotte = pivot_table.to_numpy()
-    grad_a = np.zeros((len(liste_modeles), year_max - year_min + 1))
-    Probas = (propensions * flotte)
+    pivot_table = (liste_r[['Aircraft Type', 'Delivery Date', 'rank']].pivot_table(values='rank',
+                                                                                   index='Aircraft Type',
+                                                                                   columns='Delivery Date',
+                                                                                   aggfunc='count',
+                                                                                   fill_value=0)
+                   .reindex(index=list_ac, columns=list_dates, fill_value=0))
+    pivot_table.sort_index(axis=0, inplace=True)
+    pivot_table.sort_index(axis=1, inplace=True)
 
-    liste_r['Delivery Date'] = liste_r['Delivery Date'] - year_min
-    mapping = {value: idx for idx, value in enumerate(liste_modeles)}
+    flotte = pivot_table.to_numpy()
+    grad_a = np.zeros((len(list_ac),len(list_dates)))
+    probas = (propensions * flotte)
+
+    liste_r['Delivery Date'] = liste_r['Delivery Date']
+    mapping = {value: idx for idx, value in enumerate(list_ac)}
     liste_r['Aircraft Type'] = liste_r['Aircraft Type'].map(mapping)
+    mapping2 = {value: idx for idx, value in enumerate(list_dates)}
+    liste_r['Delivery Date'] = liste_r['Delivery Date'].map(mapping2)
     data = liste_r[['Aircraft Type', 'Delivery Date']].values[0:classements[-1]]
     for row in data:
         mod = row[0]
         mill = row[1]
-        grad_a += grad_uni(mod, mill, Probas)
-        Probas[mod, mill] += -propensions[mod, mill]
-    return (grad_a)
+        grad_a += grad_uni(mod, mill, probas)
+        probas[mod, mill] += -propensions[mod, mill]
+    return grad_a
 
-
-def grad_uni(mod, mill, Probas):
-    grad = np.zeros(Probas.shape)
-    quotient = Probas.sum().sum()
+def grad_uni(mod, mill, probas):
+    grad = np.zeros(probas.shape)
+    quotient = probas.sum().sum()
     grad[mod, mill] = -1
-    grad += Probas / quotient
-    return (grad)
+    grad += probas / quotient
+    return grad
 
 def l_v(liste_r, params):
-    year_min = liste_r['Delivery Date'].min()
-    year_max = liste_r['Delivery Date'].max()
+    n_ac = params.shape[0]
+    list_ac = np.arange(n_ac)
+    list_dates = sorted(liste_r['Delivery Date'].unique())
     classements = liste_r['rank'].unique()[:-1]
-    liste_modeles = sorted(liste_r['Aircraft Type'].unique())
-    l_v = 0
+    llike = 0
     propensions = ini_propensions(params)
 
-    pivot_table = liste_r[['Aircraft Type', 'Delivery Date', 'rank']].pivot_table(values='rank', index='Aircraft Type',
-                                                                               columns='Delivery Date', aggfunc='count',
-                                                                               fill_value=0)
-    pivot_table = pivot_table.reindex(index=liste_modeles, columns=list(range(year_min, year_max + 1)), fill_value=0)
+    pivot_table = (liste_r[['Aircraft Type', 'Delivery Date', 'rank']].pivot_table(values='rank',
+                                                                                   index='Aircraft Type',
+                                                                                   columns='Delivery Date',
+                                                                                   aggfunc='count',
+                                                                                   fill_value=0)
+                   .reindex(index=list_ac, columns=list_dates, fill_value=0))
+    pivot_table.sort_index(axis = 0, inplace =True)
+    pivot_table.sort_index(axis=1, inplace =True)
     flotte = pivot_table.to_numpy()
-    Probs = propensions * flotte
+    probs = propensions * flotte
 
-    liste_r['Delivery Date'] = liste_r['Delivery Date'] - year_min
-    mapping = {value: idx for idx, value in enumerate(liste_modeles)}
+    liste_r['Delivery Date'] = liste_r['Delivery Date']
+    mapping = {value: idx for idx, value in enumerate(list_ac)}
     liste_r['Aircraft Type'] = liste_r['Aircraft Type'].map(mapping)
+    mapping2 = {value: idx for idx, value in enumerate(list_dates)}
+    liste_r['Delivery Date'] = liste_r['Delivery Date'].map(mapping2)
     data = liste_r[['Aircraft Type', 'Delivery Date']].values[0:classements[-1]]
     for row in data:
         mod = row[0]
         mill = row[1]
-        l_v += np.log(flotte[mod, mill]) - params[mod, mill] - np.log((Probs).sum().sum())
-        Probs[mod, mill] += -propensions[mod, mill]
-    return (l_v)
+        llike += np.log(flotte[mod, mill]) - params[mod, mill] - np.log(probs.sum().sum())
+        probs[mod, mill] += -propensions[mod, mill]
+    return llike
 
-def fit_type_y(df, N = 50, M = 30, vals = None):
-    list_ac = sorted(df['Aircraft Type'].unique())
+def fit_type_y(df_o, epoch = 50, rep = 30, vals = None, n_ac = None):
+    df = df_o.copy()
+    n_r = df['rank'].max()
     df['Delivery Date'] = df['Delivery Date'].astype(int)
-    year_min = df['Delivery Date'].min()
-    year_max = df['Delivery Date'].max()
+    list_dates = sorted(df['Delivery Date'].unique())
+    if n_ac is None :
+        n_ac = len(sorted(df['Aircraft Type'].unique()))
+    list_ac = np.arange(n_ac)
+    n_dates = len(list_dates)
     if vals is None :
-        vals = np.zeros((len(list_ac), year_max - year_min + 1))
+        vals = np.zeros((n_ac, n_dates))
     v_list = []
-    for i in range(N):
+    for i in range(epoch):
         print(str(i), end = ': ')
         rd_file = random_list(df, vals)
         v_list.append(l_v(rd_file, vals))
-        print(int(10**4*v_list[-1])/10**4, end=', ')
+        print(int(10**4*v_list[-1]/n_r)/10**4, end=', ')
         m = 1
-        for q in range(1, M):
+        for q in range(1, rep):
             m+= -1
             u = grad_minibatch(rd_file, vals)
             l_v_ref = l_v(rd_file, vals + 0.01 * u * 2 ** m)
@@ -191,22 +206,22 @@ def fit_type_y(df, N = 50, M = 30, vals = None):
                 while l_v_ref < v_list[-1]:
                     m -= 1
                     l_v_ref = l_v(rd_file, vals + 0.01 * u * 2 ** m)
-            vals += 0.01 * u * 2 ** (m)
-            print(int(10**4*l_v_ref)/10**4, end = ', ')
+            vals += 0.01 * u * 2 ** m
+            print(int(10**4*l_v_ref/n_r)/10**4, end = ', ')
             v_list.append(l_v_ref)
         print('')
     print ('ok')
     v_list.append(l_v(df, vals))
     vals3 = np.where(vals == 0.0, np.nan, vals)
     for j in range(len(list_ac)):
-        plt.scatter(np.arange(year_max - year_min + 1) + year_min, vals3[j, :], label=list_ac[j])
+        plt.scatter(np.array(list_dates), vals3[j, :], label=list_ac[j])
     plt.show()
     plt.plot(v_list)
     plt.show()
-    return([year_min,year_max], list_ac, vals3)
+    return vals3, list_dates, list_ac
 
 def save_prop(vals, list_ac, y_lims, title = 'propensions_test'):
-    save = pd.DataFrame(vals, index=np.arange(y_lims[0], y_lims[1] + 1), columns=list_ac)
+    save = pd.DataFrame(vals, index=y_lims, columns=list_ac)
     excel_path = 'data//retirement_propensions//'+title+'.xlsx'
     with pd.ExcelWriter(excel_path) as writer:
         save.to_excel(writer, sheet_name='propensions', index=True)
@@ -220,7 +235,218 @@ def load_prop(title='propensions_test'):
         sheet_name='propensions',
         index_col=0
     )
-    y_lims = (int(df.index.min()), int(df.index.max()))
+    list_dates = list(df.index)
     list_ac = list(df.columns)
     vals = df.values
-    return vals, list_ac, y_lims
+    return vals, list_dates, list_ac
+
+def setting_df_lin(ac_df):
+    list_ranks = ac_df['rank'].unique()
+    # Séparer les lignes où 'C' vaut 'a' et 'b'
+    filter = ac_df['rank'] == list_ranks[-1]
+    df_r = ac_df[~filter]
+    df_a = ac_df[filter]
+
+    df_a_filtered = df_a[df_a['Aircraft Type'].isin(df_r['Aircraft Type'].unique())]
+    # df_b_filtered = df_b.copy() #on pose des problèmes sur la convergence.
+    # Fusionner les DataFrames pour obtenir le résultat final
+    file_f = pd.concat([df_r, df_a_filtered])
+    file_f.reset_index(inplace= True, drop=True)
+    return file_f
+
+def random_list_lin(liste_r, params, beta):
+    list_dates = sorted(liste_r['Delivery Date'].unique())
+    propensions = ini_propensions_lin(params, beta, max(list_dates)-min(list_dates)+1)
+    n_ac = params.shape[0]
+    list_ac = np.arange(n_ac)
+    classements = liste_r['rank'].unique()
+    lignes = []
+    l_e = liste_r[liste_r['rank'] <= classements[-1]][['Aircraft Type', 'Delivery Date', 'rank']]
+    for c in classements[:-1]:
+        extract = l_e[l_e['rank'] == c]
+        n_r = extract.shape[0]
+        if n_r > 1:
+            pivot_table = (extract[['Aircraft Type', 'Delivery Date', 'rank']].pivot_table(values='rank',
+                                                                                          index='Aircraft Type',
+                                                                                          columns='Delivery Date',
+                                                                                          aggfunc='count',
+                                                                                          fill_value=0)
+                           .reindex(index=list_ac, columns=np.arange(min(list_dates),max(list_dates)+1), fill_value=0))
+            pivot_table.sort_index(axis=0, inplace=True)
+            pivot_table.sort_index(axis=1, inplace=True)
+            flotte = pivot_table.to_numpy()
+            s = propensions.shape
+            probas1 = propensions * flotte  ###on teste pour voir si ça bugue pas et si on fait mieux que 94s
+            for i in range(n_r):  ### tirage simplifié ici, à améliorer et réfléchir
+                probas2 = probas1 / probas1.sum()
+                probas_cum = probas2.cumsum()
+                tirage = rd.random()
+                modele, date = np.unravel_index(np.argmax(probas_cum >= tirage), s)
+                probas1[modele, date] += -propensions[modele, date]
+                lignes.append([list_ac[modele], date+min(list_dates), c+i])
+        else:
+            lignes.append(extract.iloc[0].tolist())
+    nouveau_df = pd.DataFrame(lignes, columns=['Aircraft Type', 'Delivery Date', 'rank'])
+    nouveau_df['rank'] = nouveau_df.index + 1
+    nouveau_df = pd.concat([nouveau_df, liste_r[liste_r['rank'] == classements[-1]]], sort=False)
+    nouveau_df = nouveau_df.reset_index(drop=True)
+    return nouveau_df
+
+def ini_propensions_lin(params, beta, n_dates):
+    propensions = np.exp(-(params[:,np.newaxis]+(beta*np.arange(n_dates))[np.newaxis,:]))
+    return propensions
+
+def grad_minibatch_lin(liste_r, params, beta):  # mode 0, classique
+    n_ac = params.shape[0]
+    list_ac = np.arange(n_ac)
+    list_dates = sorted(liste_r['Delivery Date'].unique())
+    classements = liste_r['rank'].unique()[:-1]
+    propensions = ini_propensions_lin(params, beta,max(list_dates)+1-min(list_dates))
+
+    pivot_table = (liste_r[['Aircraft Type', 'Delivery Date', 'rank']].pivot_table(values='rank',
+                                                                                   index='Aircraft Type',
+                                                                                   columns='Delivery Date',
+                                                                                   aggfunc='count',
+                                                                                   fill_value=0)
+                   .reindex(index=list_ac, columns=np.arange(min(list_dates), max(list_dates) + 1), fill_value=0))
+    pivot_table.sort_index(axis=0, inplace=True)
+    pivot_table.sort_index(axis=1, inplace=True)
+
+    flotte = pivot_table.to_numpy()
+    grad_a = np.zeros(n_ac)
+    grad_beta = 0
+    probas = (propensions * flotte)
+    j_list = np.arange(max(list_dates)-min(list_dates)+1)[np.newaxis, :]
+
+    liste_r['Delivery Date'] = liste_r['Delivery Date']
+    mapping = {value: idx for idx, value in enumerate(list_ac)}
+    liste_r['Aircraft Type'] = liste_r['Aircraft Type'].map(mapping)
+    data = liste_r[['Aircraft Type', 'Delivery Date']].values[0:classements[-1]]
+    for row in data:
+        mod = row[0]
+        mill = row[1]
+        probas_w = probas * (j_list-mill)
+        u = grad_uni_lin(mod, probas,probas_w)
+        grad_a += u[0]
+        grad_beta += u[1]
+        probas[mod, mill] += -propensions[mod, mill]
+    return grad_a, grad_beta
+
+def grad_uni_lin(mod, probas, probas_w):
+    grad_a = np.zeros(probas.shape[0])
+    quotient = probas.sum().sum()
+    grad_a[mod] = -1
+    grad_a += probas.sum(axis=1) / quotient
+    grad_beta = probas_w.sum().sum()/quotient
+    return grad_a, grad_beta
+
+def l_v_lin(liste_r, params, beta):
+    n_ac = params.shape[0]
+    list_ac = np.arange(n_ac)
+    list_dates = sorted(liste_r['Delivery Date'].unique())
+    classements = liste_r['rank'].unique()[:-1]
+    llike = 0
+    propensions = ini_propensions_lin(params, beta,max(list_dates)+1-min(list_dates))
+
+    pivot_table = (liste_r[['Aircraft Type', 'Delivery Date', 'rank']].pivot_table(values='rank',
+                                                                                   index='Aircraft Type',
+                                                                                   columns='Delivery Date',
+                                                                                   aggfunc='count',
+                                                                                   fill_value=0)
+                   .reindex(index=list_ac, columns=np.arange(min(list_dates), max(list_dates) + 1), fill_value=0))
+    pivot_table.sort_index(axis = 0, inplace =True)
+    pivot_table.sort_index(axis=1, inplace =True)
+    flotte = pivot_table.to_numpy()
+    probs = propensions * flotte
+
+    liste_r['Delivery Date'] = liste_r['Delivery Date']
+    mapping = {value: idx for idx, value in enumerate(list_ac)}
+    liste_r['Aircraft Type'] = liste_r['Aircraft Type'].map(mapping)
+    data = liste_r[['Aircraft Type', 'Delivery Date']].values[0:classements[-1]]
+    for row in data:
+        mod = row[0]
+        mill = row[1]
+        llike += np.log(flotte[mod, mill]) - params[mod]-mill*beta - np.log(probs.sum().sum())
+        probs[mod, mill] += -propensions[mod, mill]
+    return llike
+
+def fit_type_y_lin(df_o, epoch = 50, rep = 30,m_ref = 1, vals = None, beta = None,dico2_inv = None, n_ac = None ):
+    df = df_o.copy()
+    n_r = df['rank'].max()
+    df['Delivery Date'] = df['Delivery Date'].astype(int)
+    list_dates = sorted(df['Delivery Date'].unique())
+    if n_ac is None :
+        n_ac = len(sorted(df['Aircraft Type'].unique()))
+    list_ac = np.arange(n_ac)
+    n_dates = max(list_dates)-min(list_dates)+1
+    if vals is None :
+        vals = np.zeros(n_ac)
+        beta = 0
+    v_list = []
+    for i in range(epoch):
+        print(str(i), end = ': ')
+        rd_file = random_list_lin(df, vals, beta)
+        v_list.append(l_v_lin(rd_file, vals, beta))
+        print(int(10**4*v_list[-1]/n_r)/10**4, end=', ')
+        m = m_ref
+        for q in range(1, rep):
+            m+= -1
+            u = grad_minibatch_lin(rd_file, vals, beta)
+            l_v_ref = l_v_lin(rd_file, vals + 0.01 * u[0] * 2 ** m, beta + 0.01 * u[1] * 2 ** m)
+            if l_v_ref > v_list[-1] :
+                l_v_ref_2 = l_v_lin(rd_file, vals + 0.01 * u[0] * 2 ** (m+1), beta + 0.01 * u[1] * 2 ** (m+1))
+                while l_v_ref_2 > l_v_ref :
+                    m+=1
+                    l_v_ref = l_v_ref_2
+                    l_v_ref_2 = l_v_lin(rd_file, vals + 0.01 * u[0] * 2 ** (m+1), beta + 0.01 * u[1] * 2 ** (m+1))
+            else :
+                print('reduction needed')
+                while l_v_ref < v_list[-1]:
+                    m -= 1
+                    l_v_ref = l_v_lin(rd_file, vals + 0.01 * u[0] * 2 ** m, beta + 0.01 * u[1] * 2 ** m)
+            vals += 0.01 * u[0] * 2 ** m
+            beta += 0.01 * u[1] * 2 ** m
+            print(int(10**4*l_v_ref/n_r)/10**4, end = ', ')
+            v_list.append(l_v_ref)
+        print('')
+    print ('ok')
+    v_list.append(l_v_lin(df, vals,beta))
+    vals3 = np.where(vals == 0.0, np.nan, vals)
+    plt.figure(figsize=(6, 8))
+    plt.style.use('default')
+    plt.grid(axis='both')
+    if dico2_inv is None:
+        plt.barh(list_ac, vals3)
+    else:
+        plt.barh(
+            list_ac,
+            vals3,
+            tick_label=[dico2_inv[ac] for ac in list_ac]
+        )
+    plt.xlabel("Retirement coefficient")  # optionnel
+    plt.tight_layout()
+    plt.show()
+    plt.plot(v_list)
+    plt.show()
+    return vals3, beta, list_ac
+
+def save_prop_lin(vals, beta, list_ac, title = 'lin_propensions_test'):
+    data = np.concatenate([np.array([beta]), vals])
+    save = pd.DataFrame(data.reshape(1, -1), columns=['Beta'] + list(list_ac))
+    excel_path = 'data//retirement_propensions//'+title+'.xlsx'
+    with pd.ExcelWriter(excel_path) as writer:
+        save.to_excel(writer, sheet_name='beta et propensions', index=True)
+    return None
+
+
+def load_prop_lin(title='lin_propensions_test'):
+    excel_path = 'data//retirement_propensions//' + title + '.xlsx'
+    df = pd.read_excel(
+        excel_path,
+        sheet_name='beta et propensions',
+        index_col=0
+    )
+    list_ac = list(df.columns)[1:]
+    vals = df.values[0,1:]
+    beta = df.values[0,0]
+    return vals, beta, list_ac
