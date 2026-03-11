@@ -106,7 +106,7 @@ def visu_fleet(df, mapping = mapping_engines, title = 'fleet_ex'):
     history_active = history_active[sorted_cols]
 
     # 6. Visualisation avec stackplot (équivalent cumulé de fill_between)
-    plt.figure(figsize=(12, 7))
+    plt.figure(figsize=(9, 5))
 
     # stackplot prend les x (index) et les y (les valeurs de chaque colonne)
     plt.stackplot(history_active.index,
@@ -146,7 +146,7 @@ def visu_prod(df, mapping = mapping_engines, reso = 1, title = 'fleet_prod_ex'):
     history = history[sorted_cols]
 
     # 6. Visualisation avec stackplot (équivalent cumulé de fill_between)
-    plt.figure(figsize=(12, 7))
+    plt.figure(figsize=(9, 5))
 
     # stackplot prend les x (index) et les y (les valeurs de chaque colonne)
     plt.stackplot(history.index,
@@ -185,7 +185,7 @@ def visu_retirements(df, mapping = mapping_engines, reso_1 = 1, reso_2 = 1, titl
     history = history[sorted_cols]
 
     # 6. Visualisation avec stackplot (équivalent cumulé de fill_between)
-    plt.figure(figsize=(12, 7))
+    plt.figure(figsize=(9,5))
 
     # stackplot prend les x (index) et les y (les valeurs de chaque colonne)
     plt.stackplot(history.index,

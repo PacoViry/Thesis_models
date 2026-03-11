@@ -6,7 +6,7 @@ importlib.reload(am)
 def fuel_consumptions(fuel_efficiencies, utilisation_profiles):
     return None
 
-def conv_assignt(conn_data, existence_cache, alphas, betas, omegas_p, ranges, constraints, indices, speed = 1.01,  epsilon = 0.0001):
+def conv_assignt(conn_data, existence_cache, alphas, betas, omegas_p, ranges, constraints, indices, speed = 1.0,  epsilon = 0.0001):
     omegas = omegas_p.copy()
     #loop
     diffs =np.array(1)*existence_cache[indices,0]

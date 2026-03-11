@@ -4,12 +4,14 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.stats import wasserstein_distance
+from scipy.optimize import minimize
 from matplotlib.ticker import ScalarFormatter
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error, r2_score
 # import time as tm
 from src.Common_tools import vis_ref
 importlib.reload(vis_ref)
+
 
 #The entry dataset can contain the following columns :
 # 'ADEP', 'ADEP Name',  'ADES', 'ADES Name', 'Period', 'Aircraft Type', 'Aircraft Type Name', 'Aircraft Operator','Aircraft Operator Name',
@@ -138,8 +140,8 @@ def gradient_1_0_fast(data_batch, cache, alphas, betas, omegas, ranges):
     )
     return grad_alphas, grad_betas, grad_omegas
 
-def fit_function(training_data, existence_cache, ranges, num_epochs = 100, n_batches = 30, beta1 = 0.9, beta2 = 0.999, epsilon = 1e-8,
-                 learning_rate = 0.02, alphas = None, betas = None, omegas = None, n_ac = 60, n_y = 35, names_ac = None, title = 'test' ):
+def fit_function_adam(training_data, existence_cache, ranges, num_epochs = 100, n_batches = 30, beta1 = 0.9, beta2 = 0.999, epsilon = 1e-8,
+                 learning_rate = 0.02, alphas = None, betas = None, omegas = None, n_ac = 60, n_y = 35, names_ac = None, title = 'test' ,obs_norm2 = 1):
     batch_size = training_data.shape[0]//n_batches
     if alphas is None :
         alphas = np.zeros(n_ac)
@@ -151,7 +153,7 @@ def fit_function(training_data, existence_cache, ranges, num_epochs = 100, n_bat
     likely = []
     likely.append(int(100000 *
                       log_likelihood_1_0(training_data, existence_cache, alphas, betas, omegas,
-                                                               ranges)) / 100000)
+                                                               ranges)/obs_norm2) / 100000)
     print(f"Without training {likely[-1]}")
     # Boucle d'entraînement
     for epoch in range(num_epochs):
@@ -182,13 +184,110 @@ def fit_function(training_data, existence_cache, ranges, num_epochs = 100, n_bat
             omegas += learning_rate * m_omegas_hat / (np.sqrt(v_omegas_hat) + epsilon)
         likely.append(int(100000 *
                           log_likelihood_1_0(training_data, existence_cache, alphas, betas,
-                                                                   omegas, ranges)) / 100000)
+                                                                   omegas, ranges)/obs_norm2) / 100000)
         if epoch % 5 == 0:
             print(f"Log-likelihood = {likely[-1]}")
         if epoch % 50 == 49:
             save_estim(alphas, betas, omegas, names_ac,
                                              name=title +'_' + str(epoch // 50))
     return alphas, betas, omegas, likely
+
+
+
+def fit_function_bfgs(training_data, existence_cache, ranges,
+                 num_epochs=100, alphas=None, betas=None, omegas=None,
+                 n_ac=60, n_y=35, names_ac=None, title='test', obs_norm2=1):
+
+    if alphas is None:
+        alphas = np.zeros(n_ac)
+        betas = np.zeros(n_ac)
+        omegas = np.zeros((n_ac, n_y))
+
+    # --- packing / unpacking ---
+    def pack(a, b, o):
+        return np.concatenate([a, b, o.ravel()])
+
+    def unpack(theta):
+        a = theta[:n_ac]
+        b = theta[n_ac:2*n_ac]
+        o = theta[2*n_ac:].reshape((n_ac, n_y))
+        return a, b, o
+
+    theta0 = pack(alphas, betas, omegas)
+    likely = []
+    ll0 = log_likelihood_1_0(training_data, existence_cache,
+                             alphas, betas, omegas, ranges) / obs_norm2
+    likely.append(round(ll0,5))
+    print(f"Without training {likely[-1]}")
+    def objective(theta):
+
+        a,b,o = unpack(theta)
+
+        ll = log_likelihood_1_0(
+            training_data,
+            existence_cache,
+            a,b,o,
+            ranges
+        )
+
+        return -ll/obs_norm2
+
+    def gradient(theta):
+
+        a,b,o = unpack(theta)
+
+        grad_a, grad_b, grad_o = gradient_1_0_fast(
+            training_data,
+            existence_cache,
+            a,b,o,
+            ranges
+        )
+
+        g = pack(grad_a, grad_b, grad_o)
+
+        return -g/obs_norm2
+
+    cb_count = 0
+    def callback(theta):
+        nonlocal cb_count
+        cb_count+=1
+        if cb_count % 5 == 0:
+            a, b, o = unpack(theta)
+
+            ll = log_likelihood_1_0(
+                training_data,
+                existence_cache,
+                a, b, o,
+                ranges
+            ) / obs_norm2
+            likely.append(round(ll, 5))
+            print(f"Log-likelihood = {likely[-1]}")
+        if cb_count % 50 == 0:
+            save_estim(alphas, betas, omegas, names_ac,
+                       name=title + '_BFGS_'+str(cb_count//50))
+
+    result = minimize(
+        objective,
+        theta0,
+        method="L-BFGS-B",
+        jac=gradient,
+        callback=callback,
+        options={
+            "maxiter": num_epochs,
+            "disp": True,
+            "gtol": 1e-8,
+        }
+    )
+
+    alphas, betas, omegas = unpack(result.x)
+    llf = log_likelihood_1_0(training_data, existence_cache,
+                             alphas, betas, omegas, ranges) / obs_norm2
+    print(f"After training {llf}")
+    save_estim(alphas, betas, omegas, names_ac,
+               name=title + '_BFGS')
+
+    return alphas, betas, omegas, likely
+
 
 def save_estim(alphas, betas, omegas, name_c,y_min = 1990, name ='logit_model_test'):
     save1 = pd.DataFrame(alphas.reshape((1, omegas.shape[0])), columns=name_c)
@@ -254,7 +353,7 @@ def predict_assignt(conn_data, existence_cache, alphas, betas, omegas, ranges, d
     pots = pots / pots.sum(axis=0)
     return pots
 
-def obs_comp(training_data, conn_data, pots, obs_norm, save = False, title = None):
+def obs_comp(training_data, conn_data, pots, obs_norm,obs_norm2, save = False, title = None):
     e = 0
     e_p = 0
     c = 0
@@ -271,7 +370,7 @@ def obs_comp(training_data, conn_data, pots, obs_norm, save = False, title = Non
             if obs_cum_mod != 0:
                 e += np.abs(obs_real - obs_cum_mod) / obs_real
                 e_p += np.abs(obs_real - obs_cum_mod)
-                if np.abs(obs_real - obs_cum_mod) / obs_real > 0.5:
+                if np.abs(obs_real - obs_cum_mod) / obs_real > 0.25:
                     print(t, ac,obs_real, obs_cum_mod)
                 c += 1
                 m = max(m, obs_real, obs_cum_mod)
@@ -281,12 +380,16 @@ def obs_comp(training_data, conn_data, pots, obs_norm, save = False, title = Non
                 else:
                     plt.scatter(obs_real, obs_cum_mod, color='black', s=15, marker='+', linewidths=0.5, zorder=2)
     print('avg relative error : ' + str(e / c))
-    print('obs_weighted avg relative error : ' + str(e_p /obs_norm))
+    print('obs_weighted avg relative error : ' + str(e_p /obs_norm/obs_norm2))
     plt.plot([0, m], [0, m], linestyle='--', linewidth=2, label='y = x', zorder=1)
     if save:
         if title is None:
             title = 'obs_comp'
         plt.savefig('figures//assignment_figure//'+title + '.pdf', dpi=300)
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.xlim(xmin=5 * 10 ** 8, xmax=m)
+    plt.ylim(ymin=5 * 10 ** 8, ymax=m)
     plt.show()
     return None
 

@@ -11,10 +11,37 @@ print(sys.path)
 colors_5 = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd"]
 colors_10 = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd",
     "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"]
-colors_22 = [ '0',"#1f77b4", "#aec7e8", "#ff7f0e", "#ffbb78", "#2ca02c", "#98df8a",
+colors_22 = [ '0.1',"#1f77b4", "#aec7e8", "#ff7f0e", "#ffbb78", "#2ca02c", "#98df8a",
     "#d62728", "#ff9896", "#9467bd", "#c5b0d5", "#8c564b", "#c49c94",
     "#e377c2", "#f7b6d2", "#7f7f7f", "#c7c7c7", "#bcbd22", "#dbdb8d",
     "#17becf", "#9edae5", '0.95', 'purple']
+colors_26 = [
+    "#E41A1C",  # rouge vif
+    "#377EB8",  # bleu intense
+    "#4DAF4A",  # vert vif
+    "#984EA3",  # violet profond
+    "#FF7F00",  # orange vif
+    "#FFFF33",  # jaune lumineux
+    "#A65628",  # brun foncé
+    "#F781BF",  # rose vif
+    "#00FFFF",  # cyan pur
+    "#FF00FF",  # magenta pur
+    "#008080",  # turquoise foncé
+    "#3F51B5",  # indigo
+    "#B2FF00",  # vert lime
+    "#0A2A4F",  # bleu nuit,
+    "0.85", #blanc gris
+    "#FF6F61",  # corail
+    "#808000",  # vert olive
+    "#87CEEB",  # bleu ciel
+    "#B22222",  # rouge brique
+    "#CFA0E9",  # lavande
+    "#FFD700",  # jaune or
+    "#228B22",  # vert forêt
+    "#003F5C",  # bleu pétrole
+    "#D100D1",  # fuchsia
+    "#000000",  # noir
+]
 marker_type = ['o','s','^','P','x','*']
 sizes = [30,30,35,40,40,60]
 symb = ['o', 's', '^', 'v', '<', '>', 'd', 'p', 'h', '*', 'D', 'x', 'P', 'h', '8']

@@ -8,7 +8,7 @@ from PIL import Image
 import glob
 from matplotlib.ticker import FuncFormatter
 import imageio.v2 as imageio
-import importlib
+# import importlib
 from src.Common_tools import vis_ref
 import random as rd
 # importlib.reload(vis_ref)
@@ -75,14 +75,15 @@ def agg_ind_s(df, observation = 'ASK'):
 
     return df
 
-def market_vis(df, name_fig ='test_market', title_fig = None,  color_mix = vis_ref.colors_22, rank = None, color_rank =None,
+def market_vis(df, name_fig ='test_market', title_fig = None,  color_mix = vis_ref.colors_26, rank = None, color_rank =None,
                market = 'Aircraft Type', observation = 'ASK', dist_limits =(4e2, 1.9e4), capac_limits = (9e3, 4e6),
                   ask_d_ref = None, m_x_ref = None, m_y_ref = None, video = False, fun_mode = False,
-                  n_market = 12, reso = 400, smooth_param = 0.05, period_duration = 1, weight = False):
+                  n_market = 24, reso = 400, smooth_param = 0.05, period_duration = 1, weight = False, format_fig = 'pdf',
+               label_size_param = 1):
     #On peut étudier les flux par aéroport, opérateur, avion. Selon les ASKs, sieges ou nombre de vols
     #dimensions du graphe et du lissage
     plt.style.use('default')
-    fontsize_legend  = min(int(65/n_market**0.7),int(65/12**0.7))
+    fontsize_legend  = min(int(65/n_market**0.7),int(65/12**0.7))*label_size_param
     dimensions = (14,10)
     width_grid, height_grid = 21,8
     width_main, height_main = 17, 5
@@ -106,7 +107,7 @@ def market_vis(df, name_fig ='test_market', title_fig = None,  color_mix = vis_r
     if rank is not None: #rearrangement de l'ordre si nécessaire
         selec_0 = selec_0.assign(_rank=selec_0[market].map(rank)).sort_values('_rank').drop(columns='_rank').reset_index()
     selec = selec_0[market]
-    selec_n = selec_0[market+' Name'][:n_market]
+    selec_n = selec_0[market+' Name']
     if weight:
         int_traff = df[list({'ADEP', 'ADES', 'Distance_conn (km)', 'Seats_conn_p', observation + '_conn_p',
                         'Weight'})].drop_duplicates(subset=['ADES', 'ADEP'], keep='first')[
@@ -127,33 +128,33 @@ def market_vis(df, name_fig ='test_market', title_fig = None,  color_mix = vis_r
         color_rank = {ac: k for k, ac in enumerate(selec)}
 
     #Calcul des distributions marginales de chaque marché
-    Input_ac_n = np.array(df[market])
-    Input_ac = np.array(df[['Distance_conn (km)', 'Seats_conn_p', observation]])
-    Moys = []
-    Res_x_e = np.zeros((n_market + 2, reso))
-    Res_y_e = np.zeros((n_market + 2, reso))
-    Obs_tots = []
+    input_ac_n = np.array(df[market])
+    input_ac = np.array(df[['Distance_conn (km)', 'Seats_conn_p', observation]])
+    moys = []
+    res_x_e = np.zeros((n_market + 2, reso))
+    res_y_e = np.zeros((n_market + 2, reso))
+    obs_tots = []
     for i in range(n_market):
-        Input_i = Input_ac[Input_ac_n == selec[i],:]
-        Moys.append(np.array([(Input_i[:, 0]* Input_i[:, 2]).sum() / (Input_i[:, 2].sum()),
-                    (Input_i[:, 1]* Input_i[:, 2]).sum() / (Input_i[:, 2].sum())]))
-        Res_x_e[i + 1, :] = vis_ref.smooth_ln_1d(Input_i[:, 0],Input_i[:, 2],dist_limits,reso,  smooth_param_x = smooth_x)[0]
-        Res_y_e[i + 1, :] = vis_ref.smooth_ln_1d(Input_i[:, 1]/period_duration,Input_i[:, 2], capac_limits,reso,  smooth_param_x = smooth_y)[0]
-        Obs_tots.append(Input_i[:, 2].sum())
-    Input_i = Input_ac[~(np.isin(Input_ac_n, np.array(selec))), :]
-    Res_x_e[n_market + 1, :] = vis_ref.smooth_ln_1d(Input_i[:, 0],Input_i[:, 2],dist_limits,reso,  smooth_param_x = smooth_x)[0]
-    Res_y_e[n_market + 1, :] = vis_ref.smooth_ln_1d(Input_i[:, 1]/period_duration,Input_i[:, 2], capac_limits,reso,  smooth_param_x = smooth_y)[0]
-    Obs_tots.append(Input_i[:, 2].sum())
-    Res_x_e = Res_x_e.cumsum(axis=0)
-    Res_y_e = Res_y_e.cumsum(axis=0)
+        input_i = input_ac[input_ac_n == selec[i],:]
+        moys.append(np.array([(input_i[:, 0]* input_i[:, 2]).sum() / (input_i[:, 2].sum()),
+                    (input_i[:, 1]* input_i[:, 2]).sum() / (input_i[:, 2].sum())]))
+        res_x_e[i + 1, :] = vis_ref.smooth_ln_1d(input_i[:, 0],input_i[:, 2],dist_limits,reso,  smooth_param_x = smooth_x)[0]
+        res_y_e[i + 1, :] = vis_ref.smooth_ln_1d(input_i[:, 1]/period_duration,input_i[:, 2], capac_limits,reso,  smooth_param_x = smooth_y)[0]
+        obs_tots.append(input_i[:, 2].sum())
+    input_i = input_ac[~(np.isin(input_ac_n, np.array(selec))), :]
+    res_x_e[n_market + 1, :] = vis_ref.smooth_ln_1d(input_i[:, 0],input_i[:, 2],dist_limits,reso,  smooth_param_x = smooth_x)[0]
+    res_y_e[n_market + 1, :] = vis_ref.smooth_ln_1d(input_i[:, 1]/period_duration,input_i[:, 2], capac_limits,reso,  smooth_param_x = smooth_y)[0]
+    obs_tots.append(input_i[:, 2].sum())
+    res_x_e = res_x_e.cumsum(axis=0)
+    res_y_e = res_y_e.cumsum(axis=0)
 
     # Calcul des quantiles
     if ask_d_ref is None:
         ask_d_ref = traff_matrix.max()
     if m_x_ref is None:
-        m_x_ref = Res_x_e.max() * 1.05
+        m_x_ref = res_x_e.max() * 1.05
     if m_y_ref is None:
-        m_y_ref = Res_y_e.max() * 1.2
+        m_y_ref = res_y_e.max() * 1.2
     traff_matrix = traff_matrix/ask_d_ref
     quanti = np.array([0.5, 0.8, 0.95, 0.99])
     traf_quant, traf_cum, boundaries = vis_ref.quantile_classification(traff_matrix, quanti)
@@ -181,10 +182,10 @@ def market_vis(df, name_fig ='test_market', title_fig = None,  color_mix = vis_r
         label.set_bbox({'facecolor': 'none', 'alpha': 0.9, 'edgecolor': 'none'})
         label.set_text(label.get_text() + '%')
     sizes_markers = (np.array(selec_0[observation]) / market_types[observation].sum())**0.6
-    for j in range(len(Moys)):
-        main_ax.scatter(Moys[j][0], Moys[j][1], alpha=1, marker='o',
-                        color=color_mix[color_rank[selec[j]]], s=1100*sizes_markers[j], linewidth=1, edgecolor='black', zorder=3)
-        main_ax.scatter(Moys[j][0], Moys[j][1], alpha=1, marker='+', s=1100*sizes_markers[j], color='0.05', zorder=3)
+    for j in range(len(moys)):
+        main_ax.scatter(moys[j][0], moys[j][1], alpha=1, marker='o',
+                        color=color_mix[color_rank[selec[j]]], s=1500*sizes_markers[j], linewidth=1, edgecolor='black', zorder=3)
+        main_ax.scatter(moys[j][0], moys[j][1], alpha=1, marker='+', s=1500*sizes_markers[j], linewidth=2*sizes_markers[j]**0.5, color='0.05', zorder=3)
     main_ax.set_xlabel('Route distance (km)', fontsize=17, color='darkblue')
     main_ax.set_ylabel('Route capacity (seats/year)', fontsize=17, color='darkred')
     main_ax.set_xscale('log')
@@ -202,15 +203,15 @@ def market_vis(df, name_fig ='test_market', title_fig = None,  color_mix = vis_r
     main_ax.yaxis.set_minor_formatter(formatter)
     main_ax.grid(True, axis='both', which= 'major',linestyle='--',linewidth=0.5,color='0.2')
     exponent = int(np.log10(market_types[observation][0]))
-    for j in range(len(Moys)): #posera peut être un jour problème pour bien garder un ordre correct, ne pas trier et reordonner? (regarder l'ancien code)
-        x_density_ax.fill_between(X,Res_x_e[j], Res_x_e[j+1],color = color_mix[color_rank[selec[j]]],
+    for j in range(len(moys)): #posera peut être un jour problème pour bien garder un ordre correct, ne pas trier et reordonner? (regarder l'ancien code)
+        x_density_ax.fill_between(X,res_x_e[j], res_x_e[j+1],color = color_mix[color_rank[selec[j]]],
                     label = str(selec[j]).replace(" ", "")+' ' + str(selec_n[j])+': '+str(int(10**-(exponent-2)*(selec_0[observation][j])+0.5)/100)+'e'+str(exponent)+ ' '+ observation + ', '
                      + str(int(1000*(selec_0[observation][j])/market_types[observation].sum()+0.5)/10)+'%',edgecolor='black', linewidth=0.5)
-    x_density_ax.fill_between(X, Res_x_e[len(Moys)], Res_x_e[len(Moys) + 1], color='0.5',
+    x_density_ax.fill_between(X, res_x_e[len(moys)], res_x_e[len(moys) + 1], color='0.5',
                               label= 'Others: ' + str(int(10 ** -(exponent-2) * (
-                              market_types[observation][len(Moys):].sum()) + 0.5) / 100) + 'e'+str(exponent)+ ' ' + observation + ', '
-                                    + str(int(1000 * (market_types[observation][len(Moys):].sum()) / market_types[observation].sum() + 0.5) / 10) + '%', edgecolor='black', linewidth=0.5)
-    x_density_ax.plot(X, Res_x_e[len(Moys) + 1], color='0', linewidth=1.5)
+                              market_types[observation][len(moys):].sum()) + 0.5) / 100) + 'e'+str(exponent)+ ' ' + observation + ', '
+                                    + str(int(1000 * (market_types[observation][len(moys):].sum()) / market_types[observation].sum() + 0.5) / 10) + '%', edgecolor='black', linewidth=0.5)
+    x_density_ax.plot(X, res_x_e[len(moys) + 1], color='0', linewidth=1.5)
 
     if rank is not None:
         handles, labels = x_density_ax.get_legend_handles_labels()
@@ -226,15 +227,16 @@ def market_vis(df, name_fig ='test_market', title_fig = None,  color_mix = vis_r
             l if l.startswith("Others") else l.split(" ", 1)[1]
             for l in labels
         )
-        leg = x_density_ax.legend(handles, labels, loc='upper left', bbox_to_anchor=(1,1.19), ncols=1, fontsize=fontsize_legend,framealpha=0, edgecolor='none')
+        leg = x_density_ax.legend(handles, labels, loc='upper left', bbox_to_anchor=(1,1.10), ncols=1,
+                                  fontsize=fontsize_legend,framealpha=1, edgecolor='none',labelspacing=0.3)
     else :
         handles, labels = x_density_ax.get_legend_handles_labels()
         labels = tuple(
             l if l.startswith("Others") else l.split(" ", 1)[1]
             for l in labels
         )
-        leg = x_density_ax.legend(handles, labels, loc='upper left', bbox_to_anchor=(1, 1.19), ncols=1,
-                                  fontsize=fontsize_legend, framealpha=0, edgecolor='none')
+        leg = x_density_ax.legend(handles, labels, loc='upper left', bbox_to_anchor=(1, 1.10), ncols=1,
+                                  fontsize=fontsize_legend, framealpha=1, edgecolor='none',labelspacing=0.3)
     leg.set_zorder(5)
 
     x_density_ax.set_ylabel(observation +'\n'+'distribution (1)', fontsize=14)
@@ -252,9 +254,9 @@ def market_vis(df, name_fig ='test_market', title_fig = None,  color_mix = vis_r
     x_density_ax.grid(True, axis='x', which='major',linestyle='--',linewidth=0.5,color='0.3')
     x_density_ax.set_axisbelow(True)
 
-    for j in range(len(Moys)):
-        y_density_ax.fill_betweenx(Y,Res_y_e[j], Res_y_e[j+1],color = color_mix[color_rank[selec[j]]],edgecolor='black', linewidth=0.5)
-    y_density_ax.fill_betweenx(Y, Res_y_e[len(Moys)], Res_y_e[len(Moys)+ 1], color='0.5', edgecolor='black', linewidth=1)
+    for j in range(len(moys)):
+        y_density_ax.fill_betweenx(Y,res_y_e[j], res_y_e[j+1],color = color_mix[color_rank[selec[j]]],edgecolor='black', linewidth=0.5)
+    y_density_ax.fill_betweenx(Y, res_y_e[len(moys)], res_y_e[len(moys)+ 1], color='0.5', edgecolor='black', linewidth=1)
     y_density_ax.set_yscale('log')
     y_density_ax.set_xlim(0, m_y_ref)
     y_density_ax.set_ylim(capac_limits[0], capac_limits[1])
@@ -285,13 +287,13 @@ def market_vis(df, name_fig ='test_market', title_fig = None,  color_mix = vis_r
     if video:
         plt.savefig('figures/video_storage/'+name_fig+'.png', format = 'png')
     else :
-        plt.savefig('figures/assignment_figures/'+name_fig+'.pdf', format = 'pdf')
+        plt.savefig('figures/assignment_figures/'+name_fig+'.'+ format_fig, format = format_fig)
     plt.close()
     return None
 
 def assign_vis(df, market_seg, name_fig ='test_assign', title_fig = None, market = 'Aircraft Type', observation = 'ASK',
                dist_limits =(4e2, 1.9e4), capac_limits = (9e3, 4e6),reso=400, smooth_param = 0.05, video = False,
-               period_duration = 1, weight = False, vmax = None, color = 'pink'):
+               period_duration = 1, weight = False, vmax = None, color = 'pink', format_fig = 'pdf'):
     # market_seg est une liste contenant tous les identifiants à étudier.
     dimensions = (14, 10)
     width_grid, height_grid = 21, 8
@@ -435,13 +437,13 @@ def assign_vis(df, market_seg, name_fig ='test_assign', title_fig = None, market
     if video == True:
         plt.savefig('figures/video_storage/' + name_fig + '.png')
     else:
-        plt.savefig('figures/assignment_figures/' + name_fig + '.pdf')
+        plt.savefig('figures/assignment_figures/' + name_fig +'.'+ format_fig)
     plt.close()
     return None
 
 def dynamic_market_vis(df, periods, name_periods = None, video_name = 'test_video_market', format_v = 'gif', color_mix = vis_ref.colors_22, market = 'Aircraft Type',
                     observation = 'ASK', dist_limits = (4e2, 1.9e4), capac_limits = (9e3, 4e6), frame_s = 2, period_ref = None, n_market = 12,
-                       reso = 400, smooth_param = 0.05, period_duration = 1, weight = False, type_obs = None, obs_names = None):
+                       reso = 400, smooth_param = 0.05, period_duration = 1, weight = False, type_obs = None, obs_names = None,label_size_param = 1):
     selec_df = df[df['Period'].isin(periods)]
     if name_periods is None:
        name_periods = periods
@@ -526,7 +528,7 @@ def dynamic_market_vis(df, periods, name_periods = None, video_name = 'test_vide
         market_vis(selec_df[selec_df['Period'] == periods[i]],name_fig ='video_'+str(100+i), color_mix = color_mix, rank = rank, color_rank = sol,
                    market = market, observation = observation, dist_limits = dist_limits, capac_limits = capac_limits, n_market = n_market,
                    m_x_ref= traff_x_max, m_y_ref = traff_y_max, ask_d_ref = ask_max, video = True, title_fig = name_periods[i],
-                    smooth_param = smooth_param, weight = weight, reso = reso)
+                    smooth_param = smooth_param, weight = weight, reso = reso,label_size_param=label_size_param)
 
     #Animation des images
     image_files = sorted(glob.glob("figures/video_storage/*.png"))

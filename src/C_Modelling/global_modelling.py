@@ -56,12 +56,28 @@ def scenario(initial_fleet, deliveries, obs_sizes, traffic_structures, retiremen
         print('total fleet: ' + str(fleet_obs_t.sum()))
         print('total constraint: '+str(tot_obs[t]))
         fleet_obs_act_t, x_eq = fleet_content_modelling.fleet_content(0,x_eq,fleet_obs_t, retirement_propensions, tot_obs[t], epsilon = 1e-6, first = True)
+        if x_eq <1e-30 :
+            x_eq =x_eq**(1/8)
+            retirement_propensions = retirement_propensions-3*np.log(2)
         fleet_real_seats_t = fleet_obs_act_t/ taux_utilisation_usuel* np.exp(-aging_activity_coeff*(-y_s+1-t*period_duration+age_array))[:,np.newaxis]
         vol_obs.append(fleet_real_seats_t)
         # années ne sont pas importantes, eventuellement glisser en amont l'impact du vieillissement, en diminuant les quantités d'années en années.
         fleet_obs_const_t = fleet_obs_act_t.sum(axis = 0)
-        fleet_obs_const_t = np.where(fleet_obs_const_t<1e-4,0,fleet_obs_const_t) #éviter effets de seuils chelous, a REVOIR
-        existence_cache = (fleet_obs_const_t!=0)[:, np.newaxis]
+        # lightening the datafile
+        aircraft_quantity = fleet_obs_const_t.sum()
+        u = -6
+        fleet_obs_const_test = np.where(fleet_obs_const_t<aircraft_quantity*10**u,0,fleet_obs_const_t) #éviter effets de seuils chelous, a REVOIR
+        existence_cache_test = (fleet_obs_const_test!=0)[:, np.newaxis]
+        while existence_cache_test.sum()<16:
+            u-=1
+            fleet_obs_const_test = np.where(fleet_obs_const_t <aircraft_quantity*10**u, 0,
+                                            fleet_obs_const_t)  # éviter effets de seuils chelous, a REVOIR
+            existence_cache_test = (fleet_obs_const_test != 0)[:, np.newaxis]
+            if u == -200:
+                print('too many zeroes update the source code')
+                break
+        existence_cache = existence_cache_test.copy()
+        fleet_obs_const_t = fleet_obs_const_test.copy()
         non_zero_indices = np.nonzero(fleet_obs_const_t)[0]
         # print('type constraint: '+str(fleet_obs_const_t)+str(fleet_obs_const_t/(fleet_obs_t.sum(axis=0))))
         type_obs.append(fleet_obs_const_t)
@@ -80,8 +96,10 @@ def scenario(initial_fleet, deliveries, obs_sizes, traffic_structures, retiremen
         # 2. Construire la 7e colonne (obs) et 8e colonne (id)
         col7 = ass_mod[non_zero_indices,:].reshape(-1, 1)
         col8 = np.repeat(non_zero_indices, assign.shape[0]).reshape(-1, 1)
+        share_filters = pots[non_zero_indices,:].reshape(-1, 1)
         assign_final = np.hstack([assign_rep, col7, col8])
-        assign_final = assign_final[col7[:,0]>0,:]
+        # lightening the datafile (ratio tout petit
+        assign_final = assign_final[share_filters[:,0]>10**u,:]
         assignments.append(assign_final)
         df_visu = pd.DataFrame(assign_final, columns=['ADES','ADEP','Period', 'Distance_conn (km)', 'Seats_conn_p', 'Av ac seats_conn_p', 'Av ac seats', 'Aircraft Type'])
         df_visu = df_visu.astype({
