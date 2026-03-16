@@ -11,12 +11,13 @@ import imageio.v2 as imageio
 # import importlib
 from src.Common_tools import vis_ref
 import random as rd
+
 # importlib.reload(vis_ref)
 
 
 #The entry dataset can contain the following columns :
 # 'ADEP', 'ADEP Name',  'ADES', 'ADES Name', 'Period', 'Aircraft Type', 'Aircraft Type Name', 'Aircraft Operator','Aircraft Operator Name',
-# 'N_flights', 'Seats', 'ASK', 'Activity','Av ac seats', 'Distance', 'Distance_conn (km)', 'Flights_conn_p',
+# 'N_flights', 'Seats', 'ASK', 'Activity','Av_ac_seats', 'Distance', 'Distance_conn (km)', 'Flights_conn_p',
 # 'Seats_conn_p', 'ASK_conn_p', 'Activity_conn_p', 'Weight'
 #The following module allows :
 # 1) to vizualize the market composition regarding aircraft operator or aircraft type depending on different indicators
@@ -83,7 +84,6 @@ def market_vis(df, name_fig ='test_market', title_fig = None,  color_mix = vis_r
     #On peut étudier les flux par aéroport, opérateur, avion. Selon les ASKs, sieges ou nombre de vols
     #dimensions du graphe et du lissage
     plt.style.use('default')
-    fontsize_legend  = min(int(65/n_market**0.7),int(65/12**0.7))*label_size_param
     dimensions = (14,10)
     width_grid, height_grid = 21,8
     width_main, height_main = 17, 5
@@ -104,8 +104,12 @@ def market_vis(df, name_fig ='test_market', title_fig = None,  color_mix = vis_r
     #Calcul de la distribution globales
     market_types = df[[market, market+' Name', observation]].groupby([market, market+' Name']).sum().sort_values(by=observation,ascending=False).reset_index()
     selec_0 = market_types[:n_market]
-    if rank is not None: #rearrangement de l'ordre si nécessaire
-        selec_0 = selec_0.assign(_rank=selec_0[market].map(rank)).sort_values('_rank').drop(columns='_rank').reset_index()
+    n_market = selec_0.shape[0]
+    fontsize_legend = min(int(65 / n_market ** 0.7), int(65 / 12 ** 0.7)) * label_size_param
+    if rank is None :
+        print('chelou rank none')
+    if rank is not None:
+        selec_0 = selec_0.assign(_rank=selec_0[market+' Name'].map(rank)).sort_values('_rank').drop(columns='_rank').reset_index()
     selec = selec_0[market]
     selec_n = selec_0[market+' Name']
     if weight:
@@ -124,7 +128,7 @@ def market_vis(df, name_fig ='test_market', title_fig = None,  color_mix = vis_r
     traff_matrix = traff_matrix.transpose()
     X = np.exp(x)
     Y = np.exp(y)
-    if color_rank is None:
+    if color_rank is None: #pas de pré ordonnancement des couleurs
         color_rank = {ac: k for k, ac in enumerate(selec)}
 
     #Calcul des distributions marginales de chaque marché
@@ -177,10 +181,10 @@ def market_vis(df, name_fig ='test_market', title_fig = None,  color_mix = vis_r
          capac_limits[0] * (capac_limits[1] / capac_limits[0]) ** 0.55),
     ]
 
-    clabels1 = main_ax.clabel(contour, inline=True, fontsize=12, inline_spacing=8, manual=manual_positions)
-    for label in clabels1:
-        label.set_bbox({'facecolor': 'none', 'alpha': 0.9, 'edgecolor': 'none'})
-        label.set_text(label.get_text() + '%')
+    # clabels1 = main_ax.clabel(contour, inline=True, fontsize=12, inline_spacing=8, manual=manual_positions)
+    # for label in clabels1:
+    #     label.set_bbox({'facecolor': 'none', 'alpha': 0.9, 'edgecolor': 'none'})
+    #     label.set_text(label.get_text() + '%')
     sizes_markers = (np.array(selec_0[observation]) / market_types[observation].sum())**0.6
     for j in range(len(moys)):
         main_ax.scatter(moys[j][0], moys[j][1], alpha=1, marker='o',
@@ -309,16 +313,16 @@ def assign_vis(df, market_seg, name_fig ='test_assign', title_fig = None, market
 
     # Calcul de la distribution globales
     if weight:
-        int_traff = df[list({'ADEP', 'ADES', 'Distance_conn (km)', 'Seats_conn_p', observation + '_conn_p',
+        int_traff = df[list({'ADEP', 'ADES', 'Period', 'Distance_conn (km)', 'Seats_conn_p', observation + '_conn_p',
                         'Weight'})].drop_duplicates(subset=['ADES', 'ADEP'], keep='first')[
-            list({'Distance_conn (km)', 'Seats_conn_p', observation + '_conn_p', 'Weight'})]
+            list({'ADEP', 'ADES', 'Period','Distance_conn (km)', 'Seats_conn_p', observation + '_conn_p', 'Weight'})]
         traff_matrix, x, y = vis_ref.smooth_ln_2d(np.array(int_traff['Distance_conn (km)']),
                                         np.array(int_traff['Seats_conn_p']) / period_duration,
                                     np.array(int_traff[observation + '_conn_p']) * np.array(
                                                 int_traff['Weight']), dist_limits,capac_limits, reso, smooth_x, smooth_y)
     else:
-        int_traff = df[list({'ADEP', 'ADES', 'Distance_conn (km)', 'Seats_conn_p', observation + '_conn_p'})].drop_duplicates(
-        subset = ['ADES', 'ADEP'], keep = 'first')[list({'Distance_conn (km)', 'Seats_conn_p', observation + '_conn_p'})]
+        int_traff = df[list({'ADEP', 'ADES', 'Period', 'Distance_conn (km)', 'Seats_conn_p', observation + '_conn_p'})].drop_duplicates(
+        subset = ['ADES', 'ADEP'], keep = 'first')[list({'ADEP', 'ADES','Distance_conn (km)', 'Seats_conn_p', observation + '_conn_p', 'Period'})]
         traff_matrix, x, y = vis_ref.smooth_ln_2d(np.array(int_traff['Distance_conn (km)']),
             np.array(int_traff['Seats_conn_p']) / period_duration, np.array(int_traff[observation + '_conn_p']),
             dist_limits, capac_limits, reso, smooth_x, smooth_y)
@@ -348,29 +352,32 @@ def assign_vis(df, market_seg, name_fig ='test_assign', title_fig = None, market
     plt.pcolormesh(X, Y, traff_matrix_selec/traff_matrix,
                 cmap='Spectral_r', shading='gouraud', vmax=vmax)
     cbar = plt.colorbar()
-    cbar.ax.tick_params(labelsize=12)
-    cbar.set_label(observation + ' share (%)', fontsize=14)
+    cbar.ax.tick_params(labelsize=14)
+    cbar.set_label(observation + 's shares (%)', fontsize=17)
     cbar.ax.yaxis.set_major_formatter(FuncFormatter(lambda x_i, _: f'{x_i * 100:.0f}%'))
     contour = plt.contour(X, Y, 100 * np.array(traf_cum), levels=100 * np.array(quanti), colors=['black','black','black','0.3'],
                               linewidths=[1.6, 0.9, 0.9, 1.5], linestyles=['-', '-', '--', '-'], zorder=4)
-    contour2 = plt.contour(X, Y, 100 * np.array(traf_cum), levels=100 * np.array(quanti), colors='black',alpha = 0.3,
+    plt.contour(X, Y, 100 * np.array(traf_cum), levels=100 * np.array(quanti), colors='black',alpha = 0.3,
                                linewidths=[1.6, 0.9, 0.9, 1.5], linestyles=['-', '-', '--', '-'], zorder=3)
     manual_positions = [
-        (dist_limits[0] * (dist_limits[1] / dist_limits[0]) ** 0.45,
-         capac_limits[0] * (capac_limits[1] / capac_limits[0]) ** 0.40),
-        (dist_limits[0] * (dist_limits[1] / dist_limits[0]) ** 0.55,
+        (dist_limits[0] * (dist_limits[1] / dist_limits[0]) ** 0.0,
+         capac_limits[0] * (capac_limits[1] / capac_limits[0]) ** 0),
+        (dist_limits[0] * (dist_limits[1] / dist_limits[0]) ** 0.33,
+         capac_limits[0] * (capac_limits[1] / capac_limits[0]) ** 0.30),
+        (dist_limits[0] * (dist_limits[1] / dist_limits[0]) ** 0.43,
          capac_limits[0] * (capac_limits[1] / capac_limits[0]) ** 0.45),
-        (dist_limits[0] * (dist_limits[1] / dist_limits[0]) ** 0.6,
+        (dist_limits[0] * (dist_limits[1] / dist_limits[0]) ** 0.55,
          capac_limits[0] * (capac_limits[1] / capac_limits[0]) ** 0.55),
     ]
-    clabels1 = plt.clabel(contour, inline=True, fontsize=12, inline_spacing=4, manual=manual_positions)
+
+    clabels1 = plt.clabel(contour, inline=True, fontsize=16, inline_spacing=4, manual=manual_positions, colors ='black')
     for label in clabels1:
         label.set_bbox({'facecolor': 'none', 'alpha': 0.9, 'edgecolor': 'none'})
         label.set_text(label.get_text() + '%')
-    contourf = plt.contourf(X,Y,traf_cum, levels=[0.99, 1], colors='white', aspect='auto', zorder=2, alpha=1)
+    plt.contourf(X,Y,traf_cum, levels=[0.99, 1], colors='white', aspect='auto', zorder=2, alpha=1)
     plt.scatter(selec_D, selec_C, alpha=1, marker='o',
-                color=color, s=250, linewidth=1, edgecolor='black', zorder=4)
-    plt.scatter(selec_D, selec_C, alpha=1, marker='+', s=250, color='black', zorder=4)
+                color=color, s=400, linewidth=1, edgecolor='black', zorder=4)
+    plt.scatter(selec_D, selec_C, alpha=1, marker='+', s=400, color='black', zorder=4)
 
     L_boundaries = [[dist_limits[0],dist_limits[1]], [capac_limits[0],capac_limits[1]]]
     results = []
@@ -420,8 +427,10 @@ def assign_vis(df, market_seg, name_fig ='test_assign', title_fig = None, market
     plt.ylim(capac_limits[0], capac_limits[1])
     plt.xscale('log')
     plt.yscale('log')
-    plt.xlabel('Route distance (km)', fontsize=14, color='darkblue')
-    plt.ylabel('Route capacity (seats/year)', fontsize=14, color='darkred')
+    plt.xlabel('Route distance (km)', fontsize=18, color='darkblue')
+    plt.xticks(fontsize=16)
+    plt.yticks(fontsize=16)
+    plt.ylabel('Route capacity (seats/year)', fontsize=18, color='darkred')
     plt.gca().xaxis.set_major_locator(mticker.LogLocator(base=10, subs=(1, 2, 5)))
     plt.gca().xaxis.set_minor_locator(mticker.LogLocator(base=10, subs=(3, 4, 6, 7, 8, 9)))
     plt.gca().yaxis.set_major_locator(mticker.LogLocator(base=10, subs=(1, 2, 5)))
@@ -441,17 +450,18 @@ def assign_vis(df, market_seg, name_fig ='test_assign', title_fig = None, market
     plt.close()
     return None
 
-def dynamic_market_vis(df, periods, name_periods = None, video_name = 'test_video_market', format_v = 'gif', color_mix = vis_ref.colors_22, market = 'Aircraft Type',
+def dynamic_market_vis(df, periods, name_periods = None, video_name = 'test_video_market', format_v = 'gif', color_mix = vis_ref.colors_26, market = 'Aircraft Type',
                     observation = 'ASK', dist_limits = (4e2, 1.9e4), capac_limits = (9e3, 4e6), frame_s = 2, period_ref = None, n_market = 12,
-                       reso = 400, smooth_param = 0.05, period_duration = 1, weight = False, type_obs = None, obs_names = None,label_size_param = 1):
+                       reso = 400, smooth_param = 0.05, period_duration = 1, weight = False,  label_size_param = 1):
     selec_df = df[df['Period'].isin(periods)]
+
     if name_periods is None:
        name_periods = periods
     print('Color choice...')
     dimensions = (14, 10)
     width_grid, height_grid = 21, 8
     width_main, height_main = 17, 5
-    if weight is True:
+    if weight :
         selec_df[observation] = selec_df[observation]* selec_df['Weight']
     smooth_x = (np.log(dist_limits[1] - np.log(dist_limits[0]))) * smooth_param / (
             dimensions[0] * width_main / width_grid)
@@ -460,34 +470,106 @@ def dynamic_market_vis(df, periods, name_periods = None, video_name = 'test_vide
                 1] * height_main / height_grid)  # seulement pour comier le lissage de la figure précédent, peut être un sujet à adapter
 
     # Ordonnancement des couleurs
-    Lists_c = []
-    Lists_r = []
+    lists_c = []
+    lists_r = []
+    type_obs = []
+    set_ac = selec_df[market+' Name'].unique()
+    dico_ac_n = dict(zip(set_ac, range(len(set_ac))))
+    dico_n_ac = dict(zip(range(len(set_ac)), set_ac))
     for period in periods:
         df_p = selec_df[selec_df['Period'] == period]
-        group = df_p[[market,  observation]].groupby([market]).sum().sort_values(by=market, ascending=False)
+        volumes_df = (
+            df_p[[market+' Name', observation]]
+            .groupby([market+' Name'])
+            .sum()
+            .reindex(set_ac, fill_value=0)
+            .reset_index()
+        )
+        volumes_df[market+' Name'] = volumes_df[market+' Name'].map(dico_ac_n)
+        volumes = volumes_df.sort_values(by=[market+' Name']).to_numpy()
+        type_obs.append(volumes[:, 1])
+
+        group = df_p[[market+' Name',market,  observation]].groupby([market,market+' Name']).sum().sort_values(by=market, ascending=False)
         market_types = group.sort_values(by=observation, ascending=False).reset_index()
         selec = market_types[:n_market][market]
-        selec_r = market_types[market]
-        Lists_r.append(list(selec_r))
-        Lists_c.append(list(selec))
-    sol = vis_ref.color_lists(Lists_c)
+        selec_r = market_types[market+' Name']
+        lists_r.append(list(selec_r))
+        lists_c.append(list(selec))
+    sol = vis_ref.color_lists(lists_c)
     if sol is not None:
         print("Coloriage trouvé :", sol)
     else:
         print("Pas de solution simple trouvée, attribution random")
-        sol = dict(zip(Lists_c, range(2,len(Lists_c)+2)))
-    #Ordonnancement des markets pour des transitions smooth entre avions ou opérateurs
-    first = {}
-    last = {}
-    for i, list_m in enumerate(Lists_r):
-        for m in list_m :
-            if m not in first:
-                first[m] = i
-            last[m] = i
-    # trier avec nouvelle règle
-    types_sorted = sorted(first.keys(), key=lambda ac: (-first[ac], -last[ac]))
-    rank = {ac: k for k, ac in enumerate(types_sorted)}
+        sol = dict(zip(lists_c, range(2,len(lists_c)+2)))
 
+    type_obs = np.array(type_obs)
+    totals = type_obs.sum(axis=0)
+    top_k = min(48, type_obs.shape[1])
+    top_indices = np.argsort(-totals)[:top_k]
+
+    # vecteur temps
+    t = np.arange(type_obs.shape[0])
+
+    # calcul de la date moyenne d'utilisation
+    mean_date = {}
+    for m in top_indices:
+        if totals[m] > 0:
+            mean_date[m] = (t * type_obs[:, m]).sum() / totals[m]
+        else:
+            mean_date[m] = -np.inf
+
+    # tri décroissant
+    sorted_top = sorted(
+        top_indices,
+        key=lambda m: -mean_date[m]
+    )
+
+    # ajouter les autres colonnes dans leur ordre
+    others = [m for m in range(type_obs.shape[1]) if m not in sorted_top]
+    types_sorted = list(sorted_top) + others
+
+    # ranking final
+    rank2 = {m: k for k, m in enumerate(types_sorted)}
+    rank = {dico_n_ac[m]: k for k, m in enumerate(types_sorted)}
+
+    ordered_indices = sorted(
+        rank2.keys(),
+        key=lambda i: rank2[i]
+    )
+    obs_names = [dico_n_ac[ac] for ac in ordered_indices]
+
+    type_obs = type_obs[:, ordered_indices]
+
+    n_bars = type_obs.shape[0]
+    p_categories = type_obs.shape[1]
+
+    x = np.arange(n_bars) * period_duration + periods[0]
+    bottom = np.zeros(n_bars)
+    top = np.zeros(n_bars)
+    fig, ax = plt.subplots(figsize=(10, 6))
+    plt.grid(axis='y', color='grey', linestyle='--')
+
+    for i in range(p_categories):
+        top = top + type_obs[:, i]
+        if i < 24:
+            ax.fill_between(x, bottom, top, label=obs_names[i],
+                            color=color_mix[i], linewidth=0, alpha=0.9)
+            bottom = top
+        elif i < 48:
+            ax.fill_between(x, bottom, top, label=obs_names[i],
+                            color=color_mix[i - 24], linewidth=0, alpha=0.9, hatch='..', edgecolor='0.2')
+            bottom = top
+    mpl.rcParams['hatch.color'] = 'white'
+    ax.fill_between(x, bottom, top, alpha=0.9, color='grey', linewidth=0, edgecolor='white', label='Others', hatch='//')
+    ax.legend(framealpha=1, bbox_to_anchor=(1.05, 1),
+              loc='upper left', borderaxespad=0., ncol=2)
+    plt.xlim(x.min(), x.max())
+    plt.ylim(0, 1.1 * top.max())
+    plt.xlabel('Years')
+    plt.ylabel('Quantity of ' + observation)
+    plt.tight_layout()
+    plt.savefig('figures/integrated_observation/historic/' + video_name + '.pdf')
+    plt.show()
     #Hauteurs de références
     if period_ref is None :
         print('a coder, trouver la valeur maximum')
@@ -495,21 +577,23 @@ def dynamic_market_vis(df, periods, name_periods = None, video_name = 'test_vide
     else :
         df_p = selec_df[selec_df['Period']==period_ref]
         if weight :
-            int_traff = df_p[list(
-                list({'ADEP', 'ADES', 'Distance_conn (km)', 'Seats_conn_p', observation + '_conn_p', 'Weight'}))].drop_duplicates(
-                subset=['ADES', 'ADEP'], keep='first')[
-                list({'Distance_conn (km)', 'Seats_conn_p', observation + '_conn_p', 'Weight'})]
+            df_p[observation+'_weight'] = df_p[observation]*df_p['Weight']
+            int_traff = df_p[list({'ADEP', 'ADES', 'Distance_conn (km)', 'Seats_conn_p', observation + '_conn_p',
+                                   'Weight', observation+'_weight'})].groupby(
+                list({'ADEP', 'ADES', 'Distance_conn (km)', 'Seats_conn_p', observation + '_conn_p',
+                      'Weight'})).sum().reset_index()
             traff_matrix, x, y = vis_ref.smooth_ln_2d(np.array(int_traff['Distance_conn (km)']),
                                                       np.array(int_traff['Seats_conn_p']),
-                                                      np.array(int_traff[observation + '_conn_p'])*np.array(int_traff['Weight']), dist_limits,
+                                                      np.array(int_traff[observation+'_weight']), dist_limits,
                                                       capac_limits, reso,
                                                       smooth_x, smooth_y)
         else :
-            int_traff = df_p[list({'ADEP', 'ADES', 'Distance_conn (km)', 'Seats_conn_p', observation + '_conn_p'})].drop_duplicates(
-                subset=['ADES', 'ADEP'], keep='first')[list({'Distance_conn (km)', 'Seats_conn_p', observation + '_conn_p'})]
+            int_traff = df_p[list({'ADEP', 'ADES', 'Distance_conn (km)', 'Seats_conn_p', observation + '_conn_p',
+                      'Weight', observation})].groupby(list({'ADEP', 'ADES', 'Distance_conn (km)', 'Seats_conn_p', observation + '_conn_p',
+                      'Weight'})).sum().reset_index()
             traff_matrix, x, y = vis_ref.smooth_ln_2d(np.array(int_traff['Distance_conn (km)']),
                                                       np.array(int_traff['Seats_conn_p']),
-                                                      np.array(int_traff[observation + '_conn_p']), dist_limits,
+                                                      np.array(int_traff[observation]), dist_limits,
                                                       capac_limits, reso,
                                                       smooth_x, smooth_y)
         traff_matrix = traff_matrix.transpose()
@@ -521,11 +605,13 @@ def dynamic_market_vis(df, periods, name_periods = None, video_name = 'test_vide
     for filename in os.listdir('figures/video_storage/'):
         if filename.endswith(".png"):
             os.remove(os.path.join('figures/video_storage/', filename))
+
     #Créations des images
     for i in range(len(periods)):
         if i%3 == 0 :
             print(str(int(1000*i/len(periods)+0.5)/10)+'%')
-        market_vis(selec_df[selec_df['Period'] == periods[i]],name_fig ='video_'+str(100+i), color_mix = color_mix, rank = rank, color_rank = sol,
+        df_p= selec_df[selec_df['Period'] == periods[i]]
+        market_vis(df_p,name_fig ='video_'+str(100+i), color_mix = color_mix, rank = rank, color_rank = sol,
                    market = market, observation = observation, dist_limits = dist_limits, capac_limits = capac_limits, n_market = n_market,
                    m_x_ref= traff_x_max, m_y_ref = traff_y_max, ask_d_ref = ask_max, video = True, title_fig = name_periods[i],
                     smooth_param = smooth_param, weight = weight, reso = reso,label_size_param=label_size_param)
@@ -533,7 +619,7 @@ def dynamic_market_vis(df, periods, name_periods = None, video_name = 'test_vide
     #Animation des images
     image_files = sorted(glob.glob("figures/video_storage/*.png"))
     if format_v == 'video':
-        with imageio.get_writer('figures/integrated_scenario/'+video_name + '.mp4', fps=frame_s) as writer:
+        with imageio.get_writer('figures/integrated_observation/historic/'+video_name + '.mp4', fps=frame_s) as writer:
             # répéter la première image 3 fois
             for _ in range(6):
                 writer.append_data(imageio.imread(image_files[0]))
@@ -550,59 +636,9 @@ def dynamic_market_vis(df, periods, name_periods = None, video_name = 'test_vide
         # Charger les images
         frames = [Image.open(img) for img in image_files]
         # Sauvegarder en GIF animé
-        frames[0].save('figures/integrated_scenario/'+ video_name + '.gif', save_all=True,
+        frames[0].save('figures/integrated_observation/historic/'+ video_name + '.gif', save_all=True,
                        append_images=[frames[0] for i in range(3)] + frames[:] + [frames[-1] for i in range(3)],
                        duration=1000/frame_s, loop=0)
-    if type_obs is not None:
-        type_obs = np.array(type_obs)
-        print(rank)
-        # --- TRI SELON RANK ---
-        # ordered_indices = sorted(
-        #     range(len(rank)),
-        #     key=lambda i: rank[i]
-        # ) #on teste autre chose
-        ordered_indices = sorted(
-            rank.keys(),
-            key=lambda i: rank[i]
-        )
-
-
-        type_obs = type_obs[:, ordered_indices]
-        obs_names = [obs_names[i] for i in ordered_indices]
-
-        n_bars = type_obs.shape[0]
-        p_categories = type_obs.shape[1]
-
-
-
-        x = np.arange(n_bars) * period_duration + 2024
-        bottom = np.zeros(n_bars)
-        top = np.zeros(n_bars)
-        fig, ax = plt.subplots(figsize=(9,6))
-        plt.grid(axis='y', color='grey', linestyle='--')
-
-        for i in range(p_categories):
-            top = top + type_obs[:, i]
-            if i < n_market+7:
-                if ordered_indices[i] in sol :
-                    ax.fill_between(x,bottom,top,label=obs_names[i],
-                        color = color_mix[sol[ordered_indices[i]]],linewidth = 0,alpha=0.9)
-                else :
-                    ax.fill_between(x,bottom,top,label=obs_names[i],
-                        linewidth=0,alpha=0.9)
-                bottom = top
-        mpl.rcParams['hatch.color'] = 'white'
-        ax.fill_between(x,bottom,top,alpha=0.9, color='grey',linewidth = 0, edgecolor='white', label = 'Others',hatch='//')
-        ax.legend(framealpha=1,bbox_to_anchor=(1.05, 1),
-                  loc='upper left',borderaxespad=0.)
-        plt.xlim(x.min(), x.max())
-        plt.ylim(0, 1.1*top.max())
-        plt.xlabel('Years')
-        plt.ylabel('Quantity of ' + observation)
-        plt.tight_layout()
-        plt.savefig('figures/integrated_scenario/'+video_name + '.pdf')
-        plt.show()
-
     return None
 
 def dynamic_assign_vis(df, market_seg, periods, name_periods = None, video_name = 'test_video_assign', format_v = 'gif', market ='Aircraft Type',

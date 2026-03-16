@@ -72,8 +72,8 @@ def data_formatting(df, seuils_f = 0.01, n_ac = 60, obs = 'ASK', weight = True, 
         .reset_index()
         .rename(columns={obs+'_w': obs+'_w_mod'})
     )
-    conn = df_f2.drop_duplicates(subset=add+['Period', 'Distance_conn (km)', 'Seats_conn_p', obs+'_conn_p'])[
-        add+['Period', 'Distance_conn (km)', 'Seats_conn_p', obs+'_conn_p']]
+    conn = df_f2.drop_duplicates(subset=add+['Period', 'Distance_conn (km)', 'Seats_conn_p', obs+'_conn_p','Weight'])[
+        add+['Period', 'Distance_conn (km)', 'Seats_conn_p', obs+'_conn_p','Weight']]
 
     conn = pd.merge(conn,obs_conn_p,
     on=add+['Period','Distance_conn (km)', 'Seats_conn_p',obs+'_conn_p'],
@@ -141,7 +141,7 @@ def gradient_1_0_fast(data_batch, cache, alphas, betas, omegas, ranges):
     return grad_alphas, grad_betas, grad_omegas
 
 def fit_function_adam(training_data, existence_cache, ranges, num_epochs = 100, n_batches = 30, beta1 = 0.9, beta2 = 0.999, epsilon = 1e-8,
-                 learning_rate = 0.02, alphas = None, betas = None, omegas = None, n_ac = 60, n_y = 35, names_ac = None, title = 'test' ,obs_norm2 = 1):
+                 learning_rate = 0.02, alphas = None, betas = None, omegas = None, n_ac = 60, n_y = 35, names_ac = None, title = 'test' ,obs_norm2 = 1, y_min= 1990):
     batch_size = training_data.shape[0]//n_batches
     if alphas is None :
         alphas = np.zeros(n_ac)
@@ -189,14 +189,14 @@ def fit_function_adam(training_data, existence_cache, ranges, num_epochs = 100, 
             print(f"Log-likelihood = {likely[-1]}")
         if epoch % 50 == 49:
             save_estim(alphas, betas, omegas, names_ac,
-                                             name=title +'_' + str(epoch // 50))
+                        name=title +'_' + str(epoch // 50), y_min= y_min)
     return alphas, betas, omegas, likely
 
 
 
 def fit_function_bfgs(training_data, existence_cache, ranges,
                  num_epochs=100, alphas=None, betas=None, omegas=None,
-                 n_ac=60, n_y=35, names_ac=None, title='test', obs_norm2=1):
+                 n_ac=60, n_y=35, names_ac=None, title='test', obs_norm2=1, y_min= 1990):
 
     if alphas is None:
         alphas = np.zeros(n_ac)
@@ -284,7 +284,7 @@ def fit_function_bfgs(training_data, existence_cache, ranges,
                              alphas, betas, omegas, ranges) / obs_norm2
     print(f"After training {llf}")
     save_estim(alphas, betas, omegas, names_ac,
-               name=title + '_BFGS')
+               name=title + '_BFGS', y_min=y_min)
 
     return alphas, betas, omegas, likely
 
@@ -388,8 +388,8 @@ def obs_comp(training_data, conn_data, pots, obs_norm,obs_norm2, save = False, t
         plt.savefig('figures//assignment_figure//'+title + '.pdf', dpi=300)
     plt.xscale('log')
     plt.yscale('log')
-    plt.xlim(xmin=5 * 10 ** 8, xmax=m)
-    plt.ylim(ymin=5 * 10 ** 8, ymax=m)
+    plt.xlim(xmin=m/1000, xmax=m)
+    plt.ylim(ymin=m/1000, ymax=m)
     plt.show()
     return None
 

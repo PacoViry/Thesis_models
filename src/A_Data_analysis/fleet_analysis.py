@@ -2,7 +2,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import warnings
-from src.Common_tools.vis_ref import colors_5, colors_10,colors_22, vis_colors
+from src.Common_tools.vis_ref import colors_5, colors_10,colors_22, colors_26, vis_colors
 import numpy as np
 
 
@@ -237,39 +237,37 @@ def retirement_ranking(df):
     df_f = pd.concat([df_r, df_a], sort=False).reset_index(drop=True)
     return df_f
 
-def visu_retirements_array(type_obs, obs_names, period_duration, n_market,graph_name = 'ex', color_mix = colors_22):
+def visu_retirements_array(vol_obs, obs_names, period_duration, n_market,graph_name = 'ex', color_mix = colors_26):
+    retirement_seats_volumes = -np.diff(vol_obs, axis=0)
+    retirement_seats_volumes_pos = np.where(retirement_seats_volumes < 0, 0, retirement_seats_volumes)
+    type_obs = retirement_seats_volumes_pos.sum(axis=1)
     T, M = type_obs.shape
 
-    # 1) Somme de chaque colonne
     col_sums = type_obs.sum(axis=0)
 
-    # 2) Indices des 23 plus grandes sommes
-    top23_idx = np.argsort(-col_sums)[:n_market+7]
-    # 3) Calcul arrival et initial_value (identique à ton code)
-    arrival = []
-    initial_value = []
+    # indices des plus gros volumes
+    top_idx = np.argsort(-col_sums)[:n_market *2]
+
+    # calcul de la date moyenne d'utilisation
+    mean_date = []
 
     for m in range(M):
-        first = None
-        for t in range(T):
-            if type_obs[t, m] > 0:
-                first = t
-                break
-        if first is None:
-            arrival.append(-1)
-            initial_value.append(0)
+        if col_sums[m] > 0:
+            t_vals = np.arange(T)
+            mean_date.append((t_vals * type_obs[:, m]).sum() / col_sums[m])
         else:
-            arrival.append(first)
-            initial_value.append(type_obs[first, m])
-    is_top23 = np.zeros(M, dtype=bool)
-    is_top23[top23_idx] = True
+            mean_date.append(-1)
 
+    # masque top
+    is_top = np.zeros(M, dtype=bool)
+    is_top[top_idx] = True
+
+    # tri
     cols_sorted = sorted(
         range(M),
         key=lambda m: (
-            not is_top23[m],  # priorité aux top23
-            -arrival[m],
-            initial_value[m]
+            not is_top[m],  # priorité au top
+            -mean_date[m]  # date moyenne décroissante
         )
     )
 
@@ -290,25 +288,29 @@ def visu_retirements_array(type_obs, obs_names, period_duration, n_market,graph_
     x = np.arange(n_bars) * period_duration + 2024
     bottom = np.zeros(n_bars)
     top = np.zeros(n_bars)
-    fig, ax = plt.subplots(figsize=(9, 6))
+    fig, ax = plt.subplots(figsize=(10, 5.5))
     plt.grid(axis='y', color='grey', linestyle='--')
     for i in range(p_categories):
         top = top + type_obs[:, i]
-        if i < n_market+7:
+        if i < n_market:
             ax.fill_between(x, bottom, top, label=obs_names[i],
                                 color=color_mix[i], linewidth=0, alpha=0.9)
+            bottom = top
+        elif i < 2*n_market:
+            ax.fill_between(x, bottom, top, label=obs_names[i],
+                                color=color_mix[i-n_market], linewidth=0, edgecolor='0.2', alpha=0.9, hatch='..')
             bottom = top
         # else :
         #     ax.fill_between(x, bottom, top, linewidth=0, alpha=0.9)
         #     bottom = top
     ax.fill_between(x, bottom, top, alpha=0.9, color='grey', linewidth=0, edgecolor='white', label='Others', hatch='//')
     ax.legend(framealpha=1, bbox_to_anchor=(1.05, 1),
-              loc='upper left', borderaxespad=0.)
+              loc='upper left', borderaxespad=0., ncol = 2)
     plt.xlim(x.min(), x.max())
     plt.ylim(0, 1.1 * top.max())
     plt.xlabel('Years')
     plt.ylabel('Retired aircraft seats')
     plt.tight_layout()
-    plt.savefig('figures/integrated_scenario/' + graph_name+'_retir_mod.pdf')
+    plt.savefig('figures/integrated_observation/scenario/' + graph_name+'_retir_mod.pdf')
     plt.show()
     return None
