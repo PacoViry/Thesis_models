@@ -2,11 +2,10 @@ import numpy as np
 import pandas as pd
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-import matplotlib.ticker as mticker
+# import time as tm
 import os
 from PIL import Image
 import glob
-from matplotlib.ticker import FuncFormatter
 import imageio.v2 as imageio
 import importlib
 from src.C_Modelling import fleet_content_modelling
@@ -56,8 +55,8 @@ def compute_scenario(initial_fleet, deliveries, obs_sizes, traffic_structures, r
     for t in range(n_y):
         print('' + str(int(1000*t/n_y+0.5)/10), end='% ')
         fleet_pot_t[-(n_y - t), :] += deliveries[t, 0, :]
-        fleet_obs_t = fleet_pot_t * obs_sizes[np.newaxis, :] * taux_utilisation_usuel * \
-                      np.exp(aging_activity_coeff * (-y_s + 1 - t * period_duration + age_array))[:, np.newaxis]
+        fleet_obs_t = fleet_pot_t * obs_sizes[None, :] * taux_utilisation_usuel * \
+                      np.exp(aging_activity_coeff * (-y_s + 1 - t * period_duration + age_array))[:, None]
         # print('total fleet: ' + str(fleet_obs_t.sum()))
         # print('total constraint: ' + str(tot_obs[t]))
         fleet_obs_act_t, x_eq = fleet_content_modelling.fleet_content(0, x_eq, fleet_obs_t, retirement_propensions,
@@ -66,7 +65,7 @@ def compute_scenario(initial_fleet, deliveries, obs_sizes, traffic_structures, r
             x_eq = x_eq ** (1 / 8)
             retirement_propensions = retirement_propensions - 3 * np.log(2)
         fleet_real_seats_t = fleet_obs_act_t / taux_utilisation_usuel * \
-                             np.exp(-aging_activity_coeff * (-y_s + 1 - t * period_duration + age_array))[:, np.newaxis]
+                             np.exp(-aging_activity_coeff * (-y_s + 1 - t * period_duration + age_array))[:, None]
         vol_obs.append(fleet_real_seats_t)
         vol_act.append(fleet_obs_act_t)
         # années ne sont pas importantes, eventuellement glisser en amont l'impact du vieillissement, en diminuant les quantités d'années en années.
@@ -76,12 +75,12 @@ def compute_scenario(initial_fleet, deliveries, obs_sizes, traffic_structures, r
         u = -6
         fleet_obs_const_test = np.where(fleet_obs_const_t < aircraft_quantity *precision* (10 ** u), 0,
                                         fleet_obs_const_t)  # éviter effets de seuils chelous, a REVOIR
-        existence_cache = (fleet_obs_const_test != 0)[:, np.newaxis]
+        existence_cache = (fleet_obs_const_test != 0)[:, None]
         while existence_cache.sum() < 16:
             u -= 1
             fleet_obs_const_test = np.where(fleet_obs_const_t < aircraft_quantity *precision* (10 ** u), 0,
                                             fleet_obs_const_t)  # éviter effets de seuils chelous, a REVOIR
-            existence_cache = (fleet_obs_const_test != 0)[:, np.newaxis]
+            existence_cache = (fleet_obs_const_test != 0)[:, None]
             if u == -200:
                 print('Too many aircraft were too much retired...')
                 break
@@ -146,7 +145,7 @@ def create_df(traff, alphas,betas, omegas_p, ranges,types_names):
     existence_cache = (omegas_p != 0)
     pots = am.predict_assignt(traff[:, 2:], existence_cache, alphas, betas, omegas_p, ranges, d_norm=1,
                               cap_norm=1, single_p=True)
-    ass_mod = pots * traff[:, 2:][:, 3][np.newaxis, :]
+    ass_mod = pots * traff[:, 2:][:, 3][None, :]
     non_zero_indices = np.nonzero(existence_cache[:,0])[0]
     assign_rep = np.tile(traff, (non_zero_indices.shape[0], 1))
     col7 = ass_mod[non_zero_indices, :].reshape(-1, 1)
@@ -174,7 +173,7 @@ def create_df(traff, alphas,betas, omegas_p, ranges,types_names):
 
 def dynamic_pred_vis(traff_structures, alphas, betas, ranges, omegas, periods, obs_sizes = None, types_names = None, name_periods = None,
                      video_name = 'test_video_market', format_v = 'gif', color_mix = vis_ref.colors_26,
-                     market = 'Aircraft Type',observation = 'Av_ac_seats', dist_limits = (4e2, 1.9e4), capac_limits = (9e3, 4e6),
+                     market = 'Aircraft Type',observation = 'Av_ac_seats', dist_limits = (4e2, 1.9e4), capac_limits = (9e3, 5e6),
                      frame_s = 2, period_ref = None, n_market = 18,reso = 400, smooth_param = 0.04,
                      period_duration = 1,label_size_param = 1,dic_fuel = None, vals_fuel = None):
     if name_periods is None:

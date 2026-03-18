@@ -336,21 +336,34 @@ def correspondance_table(title_coeffs = 'logit_model_bts_35_5_1_9',title_tech = 
     return data_table
 
 def predict_assignt(conn_data, existence_cache, alphas, betas, omegas, ranges, d_norm = 15000, cap_norm = 15, single_p = False):
-    c_data = conn_data.copy()
-    c_data[:, 1] = c_data[:, 1] / d_norm
-    c_data[:, 2] = np.log(c_data[:, 2]) / cap_norm
-    ranges_b = ranges.copy()/d_norm
-    if single_p :
-        us = alphas.reshape(-1, 1) * c_data[:, 1] + betas.reshape(-1, 1) * c_data[:, 2] + omegas[
-            :, 0][:, np.newaxis]
-        pots = (ranges_b.reshape(-1, 1) >= c_data[:, 1].reshape(1, -1)) * (
-            existence_cache[:, 0][:, np.newaxis]) * np.exp(us)
+    if (d_norm == 1) and (cap_norm == 1):
+        distance = conn_data[:, 1]
+        capacity = np.log(conn_data[:, 2])
+        ranges_b = ranges
     else :
-        us = alphas.reshape(-1, 1) * c_data[:, 1] + betas.reshape(-1, 1) * c_data[:, 2] + omegas[
-            :, c_data[:, 0].astype(int)]
-        pots = (ranges_b.reshape(-1, 1) >= c_data[:, 1].reshape(1, -1)) * (
-        existence_cache[:, c_data[:, 0].astype(int)]) * np.exp(us)
-    pots = pots / pots.sum(axis=0)
+        distance = conn_data[:, 1] / d_norm
+        capacity = np.log(conn_data[:, 2]) / cap_norm
+        ranges_b = ranges/d_norm
+
+    if single_p :
+        us = alphas[:, None] * distance + betas[:, None] * capacity + omegas[
+            :, 0][:, None]
+        valid = (ranges_b[:, None] >= distance[None, :]) & (
+            existence_cache[:, 0][:, None])
+        us = np.where(valid, us, -np.inf)
+    else :
+        ids = conn_data[:, 0]
+        if ids.dtype != int:
+            ids = ids.astype(int)
+        us = alphas[:, None] * distance + betas[:, None] * capacity + omegas[
+            :, ids]
+        valid = (ranges_b[:, None] >= distance[None, :]) & (
+        existence_cache[:, ids])
+        us = np.where(valid, us, -np.inf)
+    us_max = np.max(us, axis=0, keepdims=True)
+    exp_us = np.exp(us - us_max)
+    denom = exp_us.sum(axis=0, keepdims=True)
+    pots = exp_us / np.maximum(denom, 1e-12)
     return pots
 
 def obs_comp(training_data, conn_data, pots, obs_norm,obs_norm2, save = False, title = None):
@@ -537,26 +550,26 @@ def regressor_visu_model(c_table, alphas_coeff, betas_coeff, reg_name='test'):
     y1 = c_table['alphas']
     y2 = c_table['betas']
     names_ac = c_table['Aircraft Type Name'].to_list()
-    plt.figure(figsize=(5.5, 5.5))
+    plt.figure(figsize=(7.5, 5.5))
     plt.grid(True, linestyle='--', linewidth=0.3, color='gray')
     p_d = 20
     p_s = 3
     u = 0
     for sqrt_range in np.linspace(1000.05 ** (1 / p_d), 18000.5 ** (1 / p_d), 19):
         ranges = 50 * int(sqrt_range ** p_d / 50)
-        inputs = np.array([ranges * np.ones(500), np.linspace(40.5 ** (1 / p_s), 500.5 ** (1 / p_s), 500) ** p_s]).T
+        inputs = np.array([ranges * np.ones(700), np.linspace(40.5 ** (1 / p_s), 700.5 ** (1 / p_s), 700) ** p_s]).T
         sample_x = np.concatenate((inputs, np.log(inputs), 1 / inputs), axis=1)
-        alphas_sample = alphas_coeff[0]+ (alphas_coeff[1:][:, np.newaxis] * sample_x.T).sum(axis =0)
-        betas_sample = betas_coeff[0]+ (betas_coeff[1:][:, np.newaxis] * sample_x.T).sum(axis =0)
+        alphas_sample = alphas_coeff[0]+ (alphas_coeff[1:][:, None] * sample_x.T).sum(axis =0)
+        betas_sample = betas_coeff[0]+ (betas_coeff[1:][:, None] * sample_x.T).sum(axis =0)
         if u % 2 == 0:
             plt.plot(alphas_sample, betas_sample, color='b', linewidth=0.5, linestyle='--', alpha=1)
         # else :
         #   plt.plot(alphas_sample, betas_sample, color = 'b', linewidth = 0.5, linestyle = '--', alpha = 0.2)
         u += 1
     u = 0
-    for cap in np.linspace(40.5 ** (1 / p_s), 500.5 ** (1 / p_s), 19):
+    for cap in np.linspace(40.5 ** (1 / p_s), 700.5 ** (1 / p_s), 19):
         cap = 5 * int(cap ** p_s / 5)
-        inputs = np.array([np.linspace(1000.05**(1/p_d),18000.5**(1/p_d),500)**p_d,cap*np.ones(500)]).T
+        inputs = np.array([np.linspace(1000.05**(1/p_d),18000.5**(1/p_d),700)**p_d,cap*np.ones(700)]).T
         sample_x = np.concatenate((inputs, np.log(inputs), 1 / inputs), axis=1)
         alphas_sample = alphas_coeff[0] + alphas_coeff[1:] @ sample_x.T
         betas_sample = betas_coeff[0] + betas_coeff[1:] @ sample_x.T
@@ -580,11 +593,11 @@ def regressor_visu_model(c_table, alphas_coeff, betas_coeff, reg_name='test'):
             fontsize=8,  # Taille de la police
             color="darkblue"  # Couleur des annotations
         )
-    ann3 = np.array([1000*np.ones(10),5*np.trunc(np.linspace(40.5**(1/p_s),500.5**(1/p_s),10)**p_s/5)]).T
+    ann3 = np.array([1000*np.ones(10),5*np.trunc(np.linspace(40.5**(1/p_s),700.5**(1/p_s),10)**p_s/5)]).T
     ann4 = np.concatenate((ann3, np.log(ann3), 1 / ann3), axis=1)
     alphas_sample = alphas_coeff[0] + alphas_coeff[1:] @ ann4.T
     betas_sample = betas_coeff[0] + betas_coeff[1:] @ ann4.T
-    for i, label in enumerate(np.linspace(40.5 ** (1 / p_s), 500.5 ** (1 / p_s), 10) ** p_s):
+    for i, label in enumerate(np.linspace(40.5 ** (1 / p_s), 700.5 ** (1 / p_s), 10) ** p_s):
         plt.scatter(alphas_sample[i], betas_sample[i], color="darkred", zorder=3, s=5, marker='s')
         plt.annotate(
             str(5 * int(label / 5+0.5)),  # Le label à afficher
@@ -596,7 +609,7 @@ def regressor_visu_model(c_table, alphas_coeff, betas_coeff, reg_name='test'):
         )
     plt.annotate(
         'MAX RANGE (km)',  # Le label à afficher
-        (-0.004, -2.4),  # Position (valeur réelle, prédiction)
+        (-0.01, -5.5),  # Position (valeur réelle, prédiction)
         textcoords="offset points",  # Décalage par rapport à la position
         xytext=(0, 0),  # Décalage en pixels (x, y)
         fontsize=12,  # Taille de la police
@@ -604,7 +617,7 @@ def regressor_visu_model(c_table, alphas_coeff, betas_coeff, reg_name='test'):
     )
     plt.annotate(
         'AVG SEATS',  # Le label à afficher
-        (-0.009, 0),  # Position (valeur réelle, prédiction)
+        (-0.015, -3.5),  # Position (valeur réelle, prédiction)
         textcoords="offset points",  # Décalage par rapport à la position
         xytext=(0, 0),  # Décalage en pixels (x, y)
         fontsize=12,  # Taille de la police
