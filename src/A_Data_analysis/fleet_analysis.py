@@ -238,9 +238,21 @@ def retirement_ranking(df):
     return df_f
 
 def visu_retirements_array(vol_obs, obs_names, period_duration, n_market,graph_name = 'ex', color_mix = colors_26):
-    retirement_seats_volumes = -np.diff(vol_obs, axis=0)
+    vol_obs_p = np.maximum.accumulate(vol_obs[::-1, :], axis=0)[::-1, :] #effet de cumulé sur le retrait.
+    retirement_seats_volumes = -np.diff(vol_obs_p, axis=0)
     retirement_seats_volumes_pos = np.where(retirement_seats_volumes < 0, 0, retirement_seats_volumes)
     type_obs = retirement_seats_volumes_pos.sum(axis=1)
+
+    retirement_seats_volumes2 = -np.diff(vol_obs, axis=0)
+    n_y_mod = retirement_seats_volumes2.shape[0]
+    n_y_ac = retirement_seats_volumes2.shape[1]
+    n_y_past = n_y_ac - n_y_mod
+    i_idx = np.arange(n_y_mod)[:, None]  # shape (n, 1)
+    j_idx = np.arange(n_y_ac)[None, :]  # shape (1, m)
+    mask = j_idx == i_idx+n_y_past  # shape (n, m)
+    retirement_seats_volumes2[mask,:]=0
+    type_obs2 = retirement_seats_volumes2.sum(axis=1)
+
     T, M = type_obs.shape
 
     col_sums = type_obs.sum(axis=0)
@@ -280,6 +292,7 @@ def visu_retirements_array(vol_obs, obs_names, period_duration, n_market,graph_n
     )
 
     type_obs = type_obs[:, ordered_indices]
+    type_obs2 = type_obs2[:, ordered_indices]
     obs_names = [obs_names[i] for i in ordered_indices]
 
     n_bars = type_obs.shape[0]
@@ -287,27 +300,40 @@ def visu_retirements_array(vol_obs, obs_names, period_duration, n_market,graph_n
 
     x = np.arange(n_bars) * period_duration + 2024
     bottom = np.zeros(n_bars)
+    bottom2 = np.zeros(n_bars)
     top = np.zeros(n_bars)
+    top2 = np.zeros(n_bars)
     fig, ax = plt.subplots(figsize=(10, 5.5))
     plt.grid(axis='y', color='grey', linestyle='--')
     for i in range(p_categories):
         top = top + type_obs[:, i]
+        top2 = top2 + type_obs2[:, i]
         if i < n_market:
-            ax.fill_between(x, bottom, top, label=obs_names[i],
-                                color=color_mix[i], linewidth=0, alpha=0.9)
+            bottom_visu = np.where(bottom<=0,np.nan, bottom)
+            top_visu = np.where(top <= 0, np.nan, top)
+            ax.fill_between(x, bottom_visu, top_visu, label=obs_names[i],
+                                color=color_mix[i], linewidth=0, alpha=1, zorder = 2)
+            ax.fill_between(x, bottom2, top2,color=color_mix[i], linewidth=0, alpha=0.4, zorder=1)
             bottom = top
-        elif i < 2*n_market:
-            ax.fill_between(x, bottom, top, label=obs_names[i],
-                                color=color_mix[i-n_market], linewidth=0, edgecolor='0.2', alpha=0.9, hatch='..')
+            bottom2 = top2
+        elif i < 2*n_market-3:
+            bottom_visu = np.where(bottom <= 0, np.nan, bottom)
+            top_visu = np.where(top <= 0, np.nan, top)
+            ax.fill_between(x, bottom_visu, top_visu, label=obs_names[i],
+                                color=color_mix[i-n_market], linewidth=0, edgecolor='0.2', alpha=1, hatch='..', zorder = 2)
+            ax.fill_between(x, bottom2, top2, color=color_mix[i-n_market], linewidth=0, alpha=0.4, zorder=1)
             bottom = top
+            bottom2 = top2
         # else :
         #     ax.fill_between(x, bottom, top, linewidth=0, alpha=0.9)
         #     bottom = top
-    ax.fill_between(x, bottom, top, alpha=0.9, color='grey', linewidth=0, edgecolor='white', label='Others', hatch='//')
+    ax.fill_between(x, bottom, top, alpha=0.8, color='grey', linewidth=0, edgecolor='white', label='Others', hatch='//', zorder = 2)
+    ax.fill_between(x, bottom2, top2, alpha=0.2, color='grey', linewidth=0, edgecolor='white', hatch='//', zorder = 1)
+    ax.fill_between(x, 0, 0, color='grey', linewidth=0.5, edgecolor='black', alpha=0.1, label='Temporary \n storage')
     ax.legend(framealpha=1, bbox_to_anchor=(1.05, 1),
               loc='upper left', borderaxespad=0., ncol = 2)
     plt.xlim(x.min(), x.max())
-    plt.ylim(0, 1.1 * top.max())
+    plt.ylim(1.05*top2.min(), 1.05 * top.max())
     plt.xlabel('Years')
     plt.ylabel('Retired aircraft seats')
     plt.tight_layout()

@@ -60,8 +60,7 @@ def heatmap_retirements(liste, n = 480, ymin = 0):
 
 
 def random_list(liste_r, params):
-    n_ac = params.shape[0]
-    list_ac = np.arange(n_ac)
+    list_ac = sorted(liste_r['Aircraft Type'].unique())
     list_dates = sorted(liste_r['Delivery Date'].unique())
     propensions = ini_propensions(params)
     classements = liste_r['rank'].unique()
@@ -142,13 +141,11 @@ def grad_uni(mod, mill, probas):
     return grad
 
 def l_v(liste_r, params):
-    n_ac = params.shape[0]
-    list_ac = np.arange(n_ac)
+    list_ac = sorted(liste_r['Aircraft Type'].unique())
     list_dates = sorted(liste_r['Delivery Date'].unique())
     classements = liste_r['rank'].unique()[:-1]
     llike = 0
     propensions = ini_propensions(params)
-
     pivot_table = (liste_r[['Aircraft Type', 'Delivery Date', 'rank']].pivot_table(values='rank',
                                                                                    index='Aircraft Type',
                                                                                    columns='Delivery Date',
@@ -173,14 +170,16 @@ def l_v(liste_r, params):
         probs[mod, mill] += -propensions[mod, mill]
     return llike
 
-def fit_type_y(df_o, epoch = 50, rep = 30, vals = None, n_ac = None):
+def fit_type_y(df_o, epoch = 50, rep = 30, vals = None, n_ac = None, title = 'TAA_free'):
     df = df_o.copy()
     n_r = df['rank'].max()
     df['Delivery Date'] = df['Delivery Date'].astype(int)
     list_dates = sorted(df['Delivery Date'].unique())
     if n_ac is None :
         n_ac = len(sorted(df['Aircraft Type'].unique()))
-    list_ac = np.arange(n_ac)
+        list_ac = sorted(df['Aircraft Type'].unique())
+    else :
+        list_ac = np.arange(n_ac)
     n_dates = len(list_dates)
     if vals is None :
         vals = np.zeros((n_ac, n_dates))
@@ -215,6 +214,7 @@ def fit_type_y(df_o, epoch = 50, rep = 30, vals = None, n_ac = None):
     vals3 = np.where(vals == 0.0, np.nan, vals)
     for j in range(len(list_ac)):
         plt.scatter(np.array(list_dates), vals3[j, :], label=list_ac[j])
+    plt.savefig('figures//estimators_figures//retir_propensions_'+title+'.png')
     plt.show()
     plt.plot(v_list)
     plt.show()

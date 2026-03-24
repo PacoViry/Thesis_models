@@ -330,7 +330,7 @@ def correspondance_table(title_coeffs = 'logit_model_bts_35_5_1_9',title_tech = 
         ['Aircraft Type Name', obs_choice + '_weight', 'Est_avg_seats', 'Est_max_range']].set_index(
         'Aircraft Type Name')
     tech_table['Aircraft Type Name'] = tech_table.index
-    data_table = pd.merge(tech_table, coeffs, left_index=True, right_index=True)
+    data_table = pd.merge(tech_table, coeffs, how = 'left', left_index=True, right_index=True)
     # p_min = int(np.log10(data_table[obs_choice + '_weight'].min())) #Pour normaliser, ici on l'enlève pour avoir une estimation réaliste pour le nombre d'avion neufs équivalents.
     # data_table[obs_choice + '_weight'] = data_table[obs_choice + '_weight'] / 10 ** p_min
     return data_table
@@ -496,8 +496,8 @@ def regressor_assign_coeffs(c_table, weight = False, weight_log = False, obs_cho
     y1 = c_table['alphas'] #variable with heteroscedasticity. Problématic in our case. We try here to weight with the log (optionnal)
     y2 = c_table['betas']
     if weight :
-        p_max = int(np.log10(c_table[obs_choice + '_weight'].max()))
-        weight_c2 = c_table[obs_choice + '_weight']/10**(p_max-2)
+        p_max = int(np.log10(c_table[obs_choice + '_w'].max()))
+        weight_c2 = c_table[obs_choice + '_w']/10**(p_max-2)
         if weight_log :
             d_min=c_table['Est_max_range'].min()
             weight_c1 = weight_c2*np.log1p(c_table['Est_max_range'].values/d_min)

@@ -14,13 +14,13 @@ def conv_assignt(conn_data, existence_cache, alphas, betas, omegas_p, ranges, co
     mask = existence_cache[indices, 0]
     # L_diffs = []
     while np.abs(diffs).max() > epsilon:
-        speed_adapt = 1.6
+        speed_adapt = 1.4
         if np.abs(diffs).max() > 0.2 :
             speed_adapt = 0.95
         elif np.abs(diffs).max() > 0.1 :
             speed_adapt = 1.05
         elif np.abs(diffs).max() > 0.05 :
-            speed_adapt = 1.3
+            speed_adapt = 1.2
         pots = am.predict_assignt(conn_data, existence_cache, alphas, betas, omegas, ranges, d_norm =1, cap_norm = 1, single_p = True)
         ass_mod = pots[indices, :] * weights
         ass_const = ass_mod.sum(axis=1)

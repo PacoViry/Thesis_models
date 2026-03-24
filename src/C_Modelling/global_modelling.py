@@ -17,8 +17,8 @@ from src.A_Data_analysis import fleet_analysis
 from src.Common_tools import vis_ref
 
 
-importlib.reload(fleet_analysis)
-importlib.reload(assignment_analysis)
+importlib.reload(fleet_content_modelling)
+# importlib.reload(assignment_analysis)
 # importlib.reload(productivity_modelling)
 importlib.reload(assignment_conv)
 
@@ -33,9 +33,6 @@ def fuel_calculations(df, seats_c, dic_fuel, fb_vals, n_flights = True): #gives 
     df['FB'] = fb*df['N_flights']
     return None
 
-def scenario_ini_params(new_ac_range, new_ac_seats, measured_prop, prosp_prop):
-    print('include actual generic ac, future ac')
-    return None
 
 def compute_scenario(initial_fleet, deliveries, obs_sizes, traffic_structures, retirement_propensions, alphas, betas, omegas_0,
              ranges, aging_activity_coeff=0, taux_utilisation_usuel=1, period_duration=1, precision = 1e-6):
@@ -49,9 +46,9 @@ def compute_scenario(initial_fleet, deliveries, obs_sizes, traffic_structures, r
 
     vol_obs = [] #on commence à vide, car la première étape consiste à supposer aucune livraison
     vol_act = []
-    omegas_l = []
     age_array = np.concatenate([np.arange(y_s), y_s + period_duration * np.arange(n_y)])
-    print('Computing '+str(n_y)+' periods:', end =' ')
+
+    print('Computing fleet composition, '+str(n_y)+' periods:', end =' ')
     for t in range(n_y):
         print('' + str(int(1000*t/n_y+0.5)/10), end='% ')
         fleet_pot_t[-(n_y - t), :] += deliveries[t, 0, :]
@@ -68,8 +65,14 @@ def compute_scenario(initial_fleet, deliveries, obs_sizes, traffic_structures, r
                              np.exp(-aging_activity_coeff * (-y_s + 1 - t * period_duration + age_array))[:, None]
         vol_obs.append(fleet_real_seats_t)
         vol_act.append(fleet_obs_act_t)
+
+    omegas_l = []
+    print('')
+    print('Computing fleet assignment, ' + str(n_y) + ' periods:', end=' ')
+    for t in range(n_y):
+        print('' + str(int(1000 * t / n_y + 0.5) / 10), end='% ')
         # années ne sont pas importantes, eventuellement glisser en amont l'impact du vieillissement, en diminuant les quantités d'années en années.
-        fleet_obs_const_t = fleet_obs_act_t.sum(axis=0)
+        fleet_obs_const_t = vol_act[t].sum(axis=0)
         # lightening the datafile
         aircraft_quantity = fleet_obs_const_t.sum()
         u = -6
@@ -90,20 +93,13 @@ def compute_scenario(initial_fleet, deliveries, obs_sizes, traffic_structures, r
                                                 ranges, fleet_obs_const_t[non_zero_indices], non_zero_indices,
                                                 epsilon=precision)
         omegas_l.append(omegas_t)
-
-        fleet_obs_const_t = fleet_obs_const_test.copy()
-        non_zero_indices = np.nonzero(fleet_obs_const_t)[0]
-        # print('type constraint: '+str(fleet_obs_const_t)+str(fleet_obs_const_t/(fleet_obs_t.sum(axis=0))))
-        # print('type age constraint:'+str(fleet_obs_act_t))
-        omegas_t = assignment_conv.conv_assignt(traffic_structures[t, :, 2:], existence_cache, alphas, betas, omegas_t,
-                                                ranges, fleet_obs_const_t[non_zero_indices], non_zero_indices, epsilon=2*precision)
     print('Ok.')
     vol_obs = np.array(vol_obs)
     vol_act = np.array(vol_act)
     return vol_obs, vol_act, np.array(omegas_l)
 
 def observe_scenario(alphas, betas,ranges, omegas, types_names, traffic_structures, period_duration=1, observation = 'Av_ac_seats',
-                     obs_sizes = None, dic_fuel = None, vals_fuel = None,period_ref = None, save_name = 'scenario_test'):
+                     obs_sizes = None, dic_fuel = None, vals_fuel = None,period_ref = None, save_name = 'scenario_test', reso=400):
     if period_ref is None :
         period_ref = omegas.shape[1] - 1
     if observation is None :
@@ -113,21 +109,21 @@ def observe_scenario(alphas, betas,ranges, omegas, types_names, traffic_structur
                          video_name=save_name+'_Av_ac_seats', format_v='video', color_mix=vis_ref.colors_26,
                          market='Aircraft Type', observation='Av_ac_seats', dist_limits=(4e2, 1.9e4),
                          capac_limits=(9e3, 4e6),period_duration=period_duration,
-                         frame_s=2, period_ref=period_ref)
+                         frame_s=2, period_ref=period_ref, reso=reso)
         print('ASK')
         dynamic_pred_vis(traffic_structures, alphas, betas, ranges, omegas, list(range(omegas.shape[0])),
                          name_periods=None, types_names=types_names, obs_sizes=obs_sizes,
                          video_name='test_sc_obs_market'+'_ASK', format_v='video', color_mix=vis_ref.colors_26,
                          market='Aircraft Type', observation='ASK', dist_limits=(4e2, 1.9e4),
                          capac_limits=(9e3, 4e6),period_duration=period_duration,
-                         frame_s=2, period_ref=period_ref)
+                         frame_s=2, period_ref=period_ref, reso=reso)
         print('FB')
         dynamic_pred_vis(traffic_structures, alphas, betas, ranges, omegas, list(range(omegas.shape[0])),
                          name_periods=None, types_names=types_names,obs_sizes=obs_sizes,
                          video_name='test_sc_obs_market'+'_FB', format_v='video', color_mix=vis_ref.colors_26,
                          market='Aircraft Type', observation='FB', dist_limits=(4e2, 1.9e4),
                          capac_limits=(9e3, 4e6), frame_s=2, period_ref=0,period_duration=period_duration,
-                         dic_fuel = dic_fuel, vals_fuel = vals_fuel)
+                         dic_fuel = dic_fuel, vals_fuel = vals_fuel, reso=reso)
         return None
     elif observation not in ['Av_ac_seats', 'ASK', 'FB']:
         print('observation not recognized.')
@@ -138,7 +134,7 @@ def observe_scenario(alphas, betas,ranges, omegas, types_names, traffic_structur
                          video_name=save_name+'_'+observation, format_v='video', color_mix=vis_ref.colors_26,
                          market='Aircraft Type', observation=observation, dist_limits=(4e2, 1.9e4),
                          capac_limits=(9e3, 4e6), frame_s=2, period_ref=period_ref,period_duration=period_duration,
-                         dic_fuel = dic_fuel, vals_fuel = vals_fuel)
+                         dic_fuel = dic_fuel, vals_fuel = vals_fuel, reso=reso)
     return None
 
 def create_df(traff, alphas,betas, omegas_p, ranges,types_names):
