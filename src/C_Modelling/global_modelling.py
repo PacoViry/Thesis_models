@@ -33,70 +33,109 @@ def fuel_calculations(df, seats_c, dic_fuel, fb_vals, n_flights = True): #gives 
     df['FB'] = fb*df['N_flights']
     return None
 
+def compute_fleet_composition(initial_fleet, deliveries, obs_sizes, traffic_structures,
+                             retirement_propensions, aging_activity_coeff=0,
+                             taux_utilisation_usuel=1, period_duration=1,
+                             precision=1e-6):
 
-def compute_scenario(initial_fleet, deliveries, obs_sizes, traffic_structures, retirement_propensions, alphas, betas, omegas_0,
-             ranges, aging_activity_coeff=0, taux_utilisation_usuel=1, period_duration=1, precision = 1e-6):
     n_y = deliveries.shape[0]
     tot_obs = traffic_structures[:, :, 5].sum(axis=1)
     y_s = initial_fleet.shape[0] - deliveries.shape[0]
 
     fleet_pot_t = initial_fleet.copy()
     x_eq = 1
-    omegas_t = omegas_0.copy()
 
-    vol_obs = [] #on commence à vide, car la première étape consiste à supposer aucune livraison
+    vol_obs = []
     vol_act = []
+
     age_array = np.concatenate([np.arange(y_s), y_s + period_duration * np.arange(n_y)])
 
-    print('Computing fleet composition, '+str(n_y)+' periods:', end =' ')
+    print(f'Computing fleet composition, {n_y} periods:', end=' ')
     for t in range(n_y):
-        print('' + str(int(1000*t/n_y+0.5)/10), end='% ')
-        fleet_pot_t[-(n_y - t), :] += deliveries[t, 0, :]
-        fleet_obs_t = fleet_pot_t * obs_sizes[None, :] * taux_utilisation_usuel * \
-                      np.exp(aging_activity_coeff * (-y_s + 1 - t * period_duration + age_array))[:, None]
-        # print('total fleet: ' + str(fleet_obs_t.sum()))
-        # print('total constraint: ' + str(tot_obs[t]))
-        fleet_obs_act_t, x_eq = fleet_content_modelling.fleet_content(0, x_eq, fleet_obs_t, retirement_propensions,
-                                                                      tot_obs[t], epsilon=precision, first=True)
-        if x_eq < 1e-30: #numerical stability
+        print(f'{int(1000*t/n_y+0.5)/10}%', end=' ')
+
+        fleet_pot_t[-(n_y - t), :] += deliveries[t, :]
+
+        fleet_obs_t = (
+            fleet_pot_t * obs_sizes[None, :] * taux_utilisation_usuel *
+            np.exp(aging_activity_coeff * (-y_s + 1 - t * period_duration + age_array))[:, None]
+        )
+
+        fleet_obs_act_t, x_eq = fleet_content_modelling.fleet_content(
+            0, x_eq, fleet_obs_t, retirement_propensions,
+            tot_obs[t], epsilon=precision, first=True
+        )
+
+        if x_eq < 1e-30:
             x_eq = x_eq ** (1 / 8)
             retirement_propensions = retirement_propensions - 3 * np.log(2)
-        fleet_real_seats_t = fleet_obs_act_t / taux_utilisation_usuel * \
-                             np.exp(-aging_activity_coeff * (-y_s + 1 - t * period_duration + age_array))[:, None]
+
+        fleet_real_seats_t = (
+            fleet_obs_act_t / taux_utilisation_usuel *
+            np.exp(-aging_activity_coeff * (-y_s + 1 - t * period_duration + age_array))[:, None]
+        )
+
         vol_obs.append(fleet_real_seats_t)
         vol_act.append(fleet_obs_act_t)
 
-    omegas_l = []
     print('')
-    print('Computing fleet assignment, ' + str(n_y) + ' periods:', end=' ')
+    return np.array(vol_obs), np.array(vol_act)
+
+def compute_fleet_assignment(vol_act, traffic_structures,
+                            alphas, betas, omegas_0, ranges,
+                            precision=1e-6):
+
+    n_y = vol_act.shape[0]
+    omegas_t = omegas_0.copy()
+    omegas_l = []
+
+    print(f'Computing fleet assignment, {n_y} periods:', end=' ')
     for t in range(n_y):
-        print('' + str(int(1000 * t / n_y + 0.5) / 10), end='% ')
-        # années ne sont pas importantes, eventuellement glisser en amont l'impact du vieillissement, en diminuant les quantités d'années en années.
+        print(f'{int(1000*t/n_y+0.5)/10}%', end=' ')
+
         fleet_obs_const_t = vol_act[t].sum(axis=0)
-        # lightening the datafile
+
         aircraft_quantity = fleet_obs_const_t.sum()
         u = -6
-        fleet_obs_const_test = np.where(fleet_obs_const_t < aircraft_quantity *precision* (10 ** u), 0,
-                                        fleet_obs_const_t)  # éviter effets de seuils chelous, a REVOIR
+
+        fleet_obs_const_test = np.where(
+            fleet_obs_const_t < aircraft_quantity * precision * (10 ** u),
+            0,
+            fleet_obs_const_t
+        )
+
         existence_cache = (fleet_obs_const_test != 0)[:, None]
+
         while existence_cache.sum() < 16:
             u -= 1
-            fleet_obs_const_test = np.where(fleet_obs_const_t < aircraft_quantity *precision* (10 ** u), 0,
-                                            fleet_obs_const_t)  # éviter effets de seuils chelous, a REVOIR
+            fleet_obs_const_test = np.where(
+                fleet_obs_const_t < aircraft_quantity * precision * (10 ** u),
+                0,
+                fleet_obs_const_t
+            )
             existence_cache = (fleet_obs_const_test != 0)[:, None]
+
             if u == -200:
                 print('Too many aircraft were too much retired...')
                 break
+
         fleet_obs_const_t = fleet_obs_const_test.copy()
         non_zero_indices = np.nonzero(existence_cache)[0]
-        omegas_t = assignment_conv.conv_assignt(traffic_structures[t, :, 2:], existence_cache, alphas, betas, omegas_t,
-                                                ranges, fleet_obs_const_t[non_zero_indices], non_zero_indices,
-                                                epsilon=precision)
+
+        omegas_t = assignment_conv.conv_assignt(
+            traffic_structures[t, :, 2:], existence_cache,
+            alphas, betas, omegas_t, ranges,
+            fleet_obs_const_t[non_zero_indices],
+            non_zero_indices,
+            epsilon=precision
+        )
+
         omegas_l.append(omegas_t)
+
     print('Ok.')
-    vol_obs = np.array(vol_obs)
-    vol_act = np.array(vol_act)
-    return vol_obs, vol_act, np.array(omegas_l)
+
+    return np.array(omegas_l)
+
 
 def observe_scenario(alphas, betas,ranges, omegas, types_names, traffic_structures, period_duration=1, observation = 'Av_ac_seats',
                      obs_sizes = None, dic_fuel = None, vals_fuel = None,period_ref = None, save_name = 'scenario_test', reso=400):

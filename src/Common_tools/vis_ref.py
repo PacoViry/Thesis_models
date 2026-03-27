@@ -2,6 +2,7 @@
 import matplotlib.pyplot as plt
 import sys
 from scipy.ndimage import gaussian_filter
+from scipy import integrate, optimize
 import numpy as np
 import networkx as nx
 import pandas as pd
@@ -178,3 +179,49 @@ def date_to_float_year(date):
         return date.year + days_since_start_of_year / year_length
     else :
         return date
+
+
+def I1(gamma, m):
+    """∫₀ᵐ t(m-t) exp(γt) dt"""
+    val, _ = integrate.quad(lambda t: t * (m - t) * np.exp(gamma * t), 0, m)
+    return val
+
+def I_d(gamma, m, a, b):
+    """∫₀ᵐ t(m-t) exp(γt) dt"""
+    val, _ = integrate.quad(lambda t: t * (m - t) * np.exp(gamma * t), a, b)
+    return val
+
+def I2(gamma, m):
+    """∫₀ᵐ t²(m-t) exp(γt) dt"""
+    val, _ = integrate.quad(lambda t: t**2 * (m - t) * np.exp(gamma * t), 0, m)
+    return val
+
+
+def solve_deliv(B, m, gamma_bounds=(-10, 10)):
+
+    if not (0 < B / 1 < m):
+        raise ValueError(
+            f"B/A = {B:.4f} doit être strictement dans (0, {m}) "
+            "(la moyenne de t sous f doit rester dans l'intervalle)."
+        )
+
+    ratio = B
+    def g(gamma):
+        i1 = I1(gamma, m)
+        if abs(i1) < 1e-14:
+            return np.inf
+        return I2(gamma, m) / i1 - ratio
+    # Vérification que g change de signe sur l'intervalle
+    ga, gb = gamma_bounds
+    fa, fb = g(ga), g(gb)
+    if fa * fb > 0:
+        raise ValueError(
+            f"Impossible de trouver gamma dans [{ga}, {gb}] : "
+            f"g({ga})={fa:.3f}, g({gb})={fb:.3f}. "
+            "Essayez d'élargir gamma_bounds."
+        )
+
+    gamma_sol = optimize.brentq(g, ga, gb, xtol=1e-12, rtol=1e-12)
+    mu_sol    = 1 / I1(gamma_sol, m)
+
+    return mu_sol, gamma_sol

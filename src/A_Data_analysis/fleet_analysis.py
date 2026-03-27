@@ -1,9 +1,11 @@
 #module Fleet_visualisation
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 import warnings
 from src.Common_tools.vis_ref import colors_5, colors_10,colors_22, colors_26, vis_colors
 import numpy as np
+import matplotlib.ticker as mtick
 
 
 warnings.filterwarnings("ignore")
@@ -237,6 +239,78 @@ def retirement_ranking(df):
     df_f = pd.concat([df_r, df_a], sort=False).reset_index(drop=True)
     return df_f
 
+
+def visu_deliveries_array(deliveries, obs_sizes, obs_names, period_duration, n_market,graph_name = 'ex', color_mix = colors_26):
+    T, M = deliveries.shape
+    deliveries = deliveries * obs_sizes[None,:]
+    col_sums = deliveries.sum(axis=0)
+    N_m = (col_sums>0).sum()
+
+    # indices des plus gros volumes
+    top_idx = np.argsort(-col_sums)[:min(n_market * 2-3,N_m)]
+    # calcul de la date moyenne d'utilisation
+    mean_date = []
+
+    for m in range(M):
+        if col_sums[m] > 0:
+            t_vals = np.arange(T)
+            mean_date.append((t_vals * deliveries[:, m]).sum() / col_sums[m])
+        else:
+            mean_date.append(-np.inf)
+
+    # masque top
+    is_top = np.zeros(M, dtype=bool)
+    is_top[top_idx] = True
+
+    # tri
+    cols_sorted = sorted(
+        range(M),
+        key=lambda m: (
+            not is_top[m],  # priorité au top
+            -mean_date[m]  # date moyenne décroissante
+        )
+    )
+
+    rank = {m: k for k, m in enumerate(cols_sorted)}
+
+    # --- TRI SELON RANK ---
+    ordered_indices = sorted(
+        range(len(rank)),
+        key=lambda i: rank[i]
+    )
+
+    deliveries = deliveries[:, ordered_indices]
+    obs_names = [obs_names[i] for i in ordered_indices]
+    n_bars = deliveries.shape[0]
+    p_categories = deliveries.shape[1]
+    x = np.arange(n_bars) * period_duration + 2024
+    bottom = np.zeros(n_bars)
+    top = np.zeros(n_bars)
+    fig, ax = plt.subplots(figsize=(10, 5.5))
+    plt.grid(axis='y', color='grey', linestyle='--')
+    for i in range(min(p_categories, N_m)):
+        top = top + deliveries[:, i]
+        if i < n_market:
+            ax.fill_between(x, bottom, top, label=obs_names[i],
+                            color=color_mix[i], linewidth=0, alpha=1, zorder=2)
+            bottom = top
+        elif i < 2 * n_market - 3:
+            ax.fill_between(x, bottom, top, label=obs_names[i],
+                            color=color_mix[i - n_market], linewidth=0, edgecolor='0.2', alpha=1, hatch='..', zorder=2)
+            bottom = top
+    ax.fill_between(x, bottom, top, alpha=0.8, color='grey', linewidth=0, edgecolor='white', label='Others', hatch='//',
+                    zorder=2)
+    ax.legend(framealpha=1, bbox_to_anchor=(1.05, 1),
+              loc='upper left', borderaxespad=0., ncol=2)
+    plt.xlim(x.min(), x.max())
+    plt.ylim(0, 1.05 * top.max())
+    plt.xlabel('Years')
+    plt.ylabel('Produced aircraft seats')
+    plt.tight_layout()
+    plt.savefig('figures/integrated_observation/scenario/' + graph_name + '_prod_mod.pdf')
+    plt.show()
+    return None
+
 def visu_retirements_array(vol_obs, obs_names, period_duration, n_market,graph_name = 'ex', color_mix = colors_26):
     vol_obs_p = np.maximum.accumulate(vol_obs[::-1, :], axis=0)[::-1, :] #effet de cumulé sur le retrait.
     retirement_seats_volumes = -np.diff(vol_obs_p, axis=0)
@@ -258,7 +332,7 @@ def visu_retirements_array(vol_obs, obs_names, period_duration, n_market,graph_n
     col_sums = type_obs.sum(axis=0)
 
     # indices des plus gros volumes
-    top_idx = np.argsort(-col_sums)[:n_market *2]
+    top_idx = np.argsort(-col_sums)[:n_market *2-3]
 
     # calcul de la date moyenne d'utilisation
     mean_date = []
@@ -333,10 +407,50 @@ def visu_retirements_array(vol_obs, obs_names, period_duration, n_market,graph_n
     ax.legend(framealpha=1, bbox_to_anchor=(1.05, 1),
               loc='upper left', borderaxespad=0., ncol = 2)
     plt.xlim(x.min(), x.max())
-    plt.ylim(1.05*top2.min(), 1.05 * top.max())
+    plt.ylim(min(0,1.05*top2.min()), 1.05 * top.max())
     plt.xlabel('Years')
     plt.ylabel('Retired aircraft seats')
     plt.tight_layout()
     plt.savefig('figures/integrated_observation/scenario/' + graph_name+'_retir_mod.pdf')
     plt.show()
     return None
+
+def constraint_plot(traff_arrays, active_fleet_arrays, ranges_c, title ='test', years = [2024,2050]):
+    N_p = traff_arrays.shape[0]
+    values_to_sort2 = np.array(ranges_c)
+    sorted_indices2 = np.argsort(values_to_sort2)
+    for t in range(N_p): #tri par distance puis somme cumulée sur les deux arrays
+        values_to_sort = traff_arrays[t, :, 0]
+        sorted_indices = np.argsort(values_to_sort)[::-1]
+        traff_arrays[t, :, :] = traff_arrays[t, sorted_indices, :]
+        traff_arrays[t,:,1] = np.cumsum(traff_arrays[t,:,1], axis=0)
+
+        active_fleet_arrays[t, :] = active_fleet_arrays[t, sorted_indices2[::-1]]
+        active_fleet_arrays[t, :] = np.cumsum(active_fleet_arrays[t, :], axis=0)
+    years_array = np.linspace(years[0], years[1], N_p)
+    norm = mpl.colors.Normalize(vmin=years[0], vmax=years[1])
+    cmap = plt.get_cmap('turbo')  # ou 'Spectral', 'viridis', 'plasma', etc.
+    fig, ax = plt.subplots(figsize=(8, 5))
+    plt.grid(axis='both', color='grey', linestyle='--')
+    for t in range(N_p):
+        color = cmap(norm(years_array[t]))
+        max_value =  traff_arrays[t, -1, 1]
+        ax.step(traff_arrays[t, :, 0], traff_arrays[t, :, 1]/max_value, linestyle ='-',where='pre', color=color, linewidth=0.5)
+        ax.step(np.concatenate([np.array([0]),ranges_c[sorted_indices2],np.array([ranges_c[sorted_indices2][-1]])]),
+                np.concatenate([np.array([1]),active_fleet_arrays[t][::-1]/max_value,np.array([0])]),where='pre', linestyle = '--', color=color, linewidth=0.5)
+    ax.set_xlabel('Connection distance /Max. Range (km)', fontsize = 13)
+    ax.set_ylabel('Share of the total seats', fontsize = 13)
+    ax.plot([0,0],[0,0], label = 'Active fleet capabilities', linestyle = '--', color = 'black', linewidth=1)
+    ax.plot([0,0],[0,0], label = 'Traffic distances', linestyle = '-', color = 'black', linewidth=1)
+    plt.legend(loc='upper right', framealpha=1, fontsize = 13)
+    plt.xlim(0)
+    plt.ylim(0, 1.05)
+    plt.tight_layout()
+    ax.yaxis.set_major_formatter(mtick.PercentFormatter(xmax=1))
+    ax.yaxis.set_major_locator(mtick.MultipleLocator(0.2))
+    sm = mpl.cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])  # requis pour matplotlib
+
+    cbar = plt.colorbar(sm, ax=ax)
+    cbar.set_label('Year', fontsize = 13)
+    plt.savefig('figures/integrated_observation/scenario/range_constraints/constraint_plot_'+title+'.pdf')

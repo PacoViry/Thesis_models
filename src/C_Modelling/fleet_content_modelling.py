@@ -15,7 +15,9 @@ def fleet_content(a, b, fleet_obs_t, retirement_coeffs, constraint, epsilon=0.00
         fleets_b = b**(np.exp(-retirement_coeffs)) * fleet_obs_t
         if fleets_b.sum().sum() < constraint :
             print('temporary aircraft parking', end=' ')
-            return fleet_content(b, 1,fleet_obs_t, retirement_coeffs, constraint, epsilon)
+            # return fleet_content(b, 1,fleet_obs_t, retirement_coeffs, constraint, epsilon)
+            # print(b)
+            return fleet_content(b, b*2, fleet_obs_t, retirement_coeffs, constraint, epsilon, first = True)
 
     fleets = ((a+b)/2)**(np.exp(-retirement_coeffs)) * fleet_obs_t
     e = (fleets.sum().sum() - constraint)/constraint

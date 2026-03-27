@@ -643,4 +643,4 @@ def regressor_visu_model(c_table, alphas_coeff, betas_coeff, reg_name='test'):
 
 def assign_coeffs_pred(alphas_coeff, betas_coeff,seats_ac, range_ac):
     x = np.array([range_ac, seats_ac,np.log(range_ac), np.log(seats_ac), 1 / range_ac, 1 / seats_ac])
-    return alphas_coeff[0]+ (x*alphas_coeff[1:]).sum(), betas_coeff[0]+ (x*betas_coeff[1:]).sum(),seats_ac, range_ac
+    return alphas_coeff[0]+ (x*alphas_coeff[1:]).sum(), betas_coeff[0]+ (x*betas_coeff[1:]).sum()
