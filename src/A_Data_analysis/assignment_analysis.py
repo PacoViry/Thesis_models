@@ -188,7 +188,7 @@ def market_vis(df, name_fig ='test_market', title_fig = None,  color_mix = vis_r
     sizes_markers = (np.array(selec_0[observation]) / market_types[observation].sum())**0.6
     for j in range(len(moys)):
         main_ax.scatter(moys[j][0], moys[j][1], alpha=1, marker='o',
-                        color=color_mix[color_rank[selec[j]]], s=1500*sizes_markers[j], linewidth=1, edgecolor='black', zorder=3)
+                        color=color_mix[color_rank[selec[j]]%25], s=1500*sizes_markers[j], linewidth=1, edgecolor='black', zorder=3)
         main_ax.scatter(moys[j][0], moys[j][1], alpha=1, marker='+', s=1500*sizes_markers[j], linewidth=2*sizes_markers[j]**0.5, color='0.05', zorder=3)
     main_ax.set_xlabel('Route distance (km)', fontsize=17, color='darkblue')
     main_ax.set_ylabel('Route capacity (seats/year)', fontsize=17, color='darkred')
@@ -208,7 +208,7 @@ def market_vis(df, name_fig ='test_market', title_fig = None,  color_mix = vis_r
     main_ax.grid(True, axis='both', which= 'major',linestyle='--',linewidth=0.5,color='0.2')
     exponent = int(np.log10(market_types[observation][0]))
     for j in range(len(moys)): #posera peut être un jour problème pour bien garder un ordre correct, ne pas trier et reordonner? (regarder l'ancien code)
-        x_density_ax.fill_between(X,res_x_e[j], res_x_e[j+1],color = color_mix[color_rank[selec[j]]],
+        x_density_ax.fill_between(X,res_x_e[j], res_x_e[j+1],color = color_mix[color_rank[selec[j]]%25],
                     label = str(selec[j]).replace(" ", "")+' ' + str(selec_n[j])+': '+str(int(10**-(exponent-2)*(selec_0[observation][j])+0.5)/100)+'e'+str(exponent)+ ' '+ observation + ', '
                      + str(int(1000*(selec_0[observation][j])/market_types[observation].sum()+0.5)/10)+'%',edgecolor='black', linewidth=0.5)
     x_density_ax.fill_between(X, res_x_e[len(moys)], res_x_e[len(moys) + 1], color='0.5',
@@ -239,7 +239,7 @@ def market_vis(df, name_fig ='test_market', title_fig = None,  color_mix = vis_r
             l if l.startswith("Others") else l.split(" ", 1)[1]
             for l in labels
         )
-        leg = x_density_ax.legend(handles, labels, loc='upper left', bbox_to_anchor=(1, 1.10), ncols=1,
+        leg = x_density_ax.legend(handles, labels, loc='upper left', bbox_to_anchor=(1, 1.08), ncols=int(n_market/25+1),
                                   fontsize=fontsize_legend, framealpha=1, edgecolor='none',labelspacing=0.3)
     leg.set_zorder(5)
 
@@ -259,7 +259,7 @@ def market_vis(df, name_fig ='test_market', title_fig = None,  color_mix = vis_r
     x_density_ax.set_axisbelow(True)
 
     for j in range(len(moys)):
-        y_density_ax.fill_betweenx(Y,res_y_e[j], res_y_e[j+1],color = color_mix[color_rank[selec[j]]],edgecolor='black', linewidth=0.5)
+        y_density_ax.fill_betweenx(Y,res_y_e[j], res_y_e[j+1],color = color_mix[color_rank[selec[j]]%25],edgecolor='black', linewidth=0.5)
     y_density_ax.fill_betweenx(Y, res_y_e[len(moys)], res_y_e[len(moys)+ 1], color='0.5', edgecolor='black', linewidth=1)
     y_density_ax.set_yscale('log')
     y_density_ax.set_xlim(0, m_y_ref)
