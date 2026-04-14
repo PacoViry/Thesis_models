@@ -33,7 +33,7 @@ def activity_assignment(df, excel_title, corrective_factor = 1.0, d_seuil=5000, 
     )
     df['Estimated FT'] = (((df['Distance_conn (km)']<d_seuil*corrective_factor)*corrective_factor*df['Distance_conn (km)']/v_1 +
                           (df['Distance_conn (km)'] >= d_seuil*corrective_factor) * corrective_factor *df['Distance_conn (km)'] / v_2)
-                          + supp*(1-np.exp(-df['Distance_conn (km)']*corrective_factor/v_c*(v_1-v_c)/supp))) #terme à la schlague pour intégrer une grimpe progressive et les 2 asymptotes
+                          + supp*(1-np.exp(-df['Distance_conn (km)']*corrective_factor/(v_c*v_1)*(v_1-v_c)/supp))) #terme à la schlague pour intégrer une grimpe progressive et les 2 asymptotes
     gt_cont = linear_interp(np.log(df['Estimated FT'].values+0.3)) #+0.3 correspond aux effets du taxi in/out
     if act :
         df['Activity'] = df['N_flights']*(df['Estimated FT']+gt_cont)/(24*365.25)

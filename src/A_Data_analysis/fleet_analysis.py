@@ -239,7 +239,6 @@ def retirement_ranking(df):
     df_f = pd.concat([df_r, df_a], sort=False).reset_index(drop=True)
     return df_f
 
-
 def visu_deliveries_array(deliveries, obs_sizes, obs_names, period_duration, n_market,graph_name = 'ex', color_mix = colors_26):
     T, M = deliveries.shape
     deliveries = deliveries * obs_sizes[None,:]

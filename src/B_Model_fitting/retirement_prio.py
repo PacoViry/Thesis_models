@@ -183,33 +183,42 @@ def fit_type_y(df_o, epoch = 50, rep = 30, vals = None, n_ac = None, title = 'TA
     n_dates = len(list_dates)
     if vals is None :
         vals = np.zeros((n_ac, n_dates))
+
+    # --- Adam hyperparameters ---
+    learning_rate = 0.02
+    beta1 = 0.9
+    beta2 = 0.999
+    epsilon = 1e-8
+
+    # --- Adam states ---
+    m_vals = np.zeros_like(vals)
+    v_vals = np.zeros_like(vals)
+    t = 0
+
     v_list = []
     for i in range(epoch):
         print(str(i), end = ': ')
         rd_file = random_list(df, vals)
         v_list.append(l_v(rd_file, vals))
         print(int(10**4*v_list[-1]/n_r)/10**4, end=', ')
-        m = 1
+
         for q in range(1, rep):
-            m+= -1
-            u = grad_minibatch(rd_file, vals)
-            l_v_ref = l_v(rd_file, vals + 0.01 * u * 2 ** m)
-            if l_v_ref > v_list[-1] :
-                l_v_ref_2 = l_v(rd_file, vals + 0.01 * u * 2 ** (m+1))
-                while l_v_ref_2 > l_v_ref :
-                    m+=1
-                    l_v_ref = l_v_ref_2
-                    l_v_ref_2 = l_v(rd_file, vals + 0.01 * u * 2 ** (m+1))
-            else :
-                print('reduction needed')
-                while l_v_ref < v_list[-1]:
-                    m -= 1
-                    l_v_ref = l_v(rd_file, vals + 0.01 * u * 2 ** m)
-            vals += 0.01 * u * 2 ** m
+            grad_vals = grad_minibatch(rd_file, vals)
+
+            t += 1
+            m_vals = beta1 * m_vals + (1 - beta1) * grad_vals
+            v_vals = beta2 * v_vals + (1 - beta2) * (grad_vals ** 2)
+
+            m_vals_hat = m_vals / (1 - beta1 ** t)
+            v_vals_hat = v_vals / (1 - beta2 ** t)
+
+            vals += learning_rate * m_vals_hat / (np.sqrt(v_vals_hat) + epsilon)
+
+            l_v_ref = l_v(rd_file, vals)
             print(int(10**4*l_v_ref/n_r)/10**4, end = ', ')
             v_list.append(l_v_ref)
         print('')
-    print ('ok')
+    print('ok')
     v_list.append(l_v(df, vals))
     vals3 = np.where(vals == 0.0, np.nan, vals)
     for j in range(len(list_ac)):
@@ -363,6 +372,7 @@ def l_v_lin(liste_r, params, beta):
     mapping = {value: idx for idx, value in enumerate(list_ac)}
     liste_r['Aircraft Type'] = liste_r['Aircraft Type'].map(mapping)
     data = liste_r[['Aircraft Type', 'Delivery Date']].values[0:classements[-1]]
+
     for row in data:
         mod = row[0]
         mill = row[1]
@@ -370,7 +380,7 @@ def l_v_lin(liste_r, params, beta):
         probs[mod, mill] += -propensions[mod, mill]
     return llike
 
-def fit_type_y_lin(df_o, epoch = 50, rep = 30,m_ref = 1, vals = None, beta = None,dico2_inv = None, n_ac = None ):
+def fit_type_y_lin(df_o, epoch = 50, rep = 30, vals = None, beta = None,dico2_inv = None, n_ac = None ):
     df = df_o.copy()
     n_r = df['rank'].max()
     df['Delivery Date'] = df['Delivery Date'].astype(int)
@@ -382,35 +392,56 @@ def fit_type_y_lin(df_o, epoch = 50, rep = 30,m_ref = 1, vals = None, beta = Non
     if vals is None :
         vals = np.zeros(n_ac)
         beta = 0
+
+    # --- Adam hyperparameters ---
+    learning_rate = 0.02
+    beta1 = 0.9
+    beta2 = 0.999
+    epsilon = 1e-8
+
+    # --- Adam states ---
+    m_vals = np.zeros_like(vals)
+    v_vals = np.zeros_like(vals)
+    m_beta = 0.0
+    v_beta = 0.0
+    t = 0
+
+    if dico2_inv is None :
+        list_types = sorted(df['Aircraft Type'].unique())
+        dico2_inv = {value: idx for idx, value in enumerate(list_types)}
     v_list = []
+
     for i in range(epoch):
         print(str(i), end = ': ')
         rd_file = random_list_lin(df, vals, beta)
         v_list.append(l_v_lin(rd_file, vals, beta))
         print(int(10**4*v_list[-1]/n_r)/10**4, end=', ')
-        m = m_ref
+
+        # one Adam update per mini-batch
         for q in range(1, rep):
-            m+= -1
-            u = grad_minibatch_lin(rd_file, vals, beta)
-            l_v_ref = l_v_lin(rd_file, vals + 0.01 * u[0] * 2 ** m, beta + 0.01 * u[1] * 2 ** m)
-            if l_v_ref > v_list[-1] :
-                l_v_ref_2 = l_v_lin(rd_file, vals + 0.01 * u[0] * 2 ** (m+1), beta + 0.01 * u[1] * 2 ** (m+1))
-                while l_v_ref_2 > l_v_ref :
-                    m+=1
-                    l_v_ref = l_v_ref_2
-                    l_v_ref_2 = l_v_lin(rd_file, vals + 0.01 * u[0] * 2 ** (m+1), beta + 0.01 * u[1] * 2 ** (m+1))
-            else :
-                print('reduction needed')
-                while l_v_ref < v_list[-1]:
-                    m -= 1
-                    l_v_ref = l_v_lin(rd_file, vals + 0.01 * u[0] * 2 ** m, beta + 0.01 * u[1] * 2 ** m)
-            vals += 0.01 * u[0] * 2 ** m
-            beta += 0.01 * u[1] * 2 ** m
+            grad_vals, grad_beta = grad_minibatch_lin(rd_file, vals, beta)
+
+            t += 1
+            m_vals = beta1 * m_vals + (1 - beta1) * grad_vals
+            v_vals = beta2 * v_vals + (1 - beta2) * (grad_vals ** 2)
+            m_beta = beta1 * m_beta + (1 - beta1) * grad_beta
+            v_beta = beta2 * v_beta + (1 - beta2) * (grad_beta ** 2)
+
+            m_vals_hat = m_vals / (1 - beta1 ** t)
+            v_vals_hat = v_vals / (1 - beta2 ** t)
+            m_beta_hat = m_beta / (1 - beta1 ** t)
+            v_beta_hat = v_beta / (1 - beta2 ** t)
+
+            vals += learning_rate * m_vals_hat / (np.sqrt(v_vals_hat) + epsilon)
+            beta += learning_rate * m_beta_hat / (np.sqrt(v_beta_hat) + epsilon)
+
+            l_v_ref = l_v_lin(rd_file, vals, beta)
             print(int(10**4*l_v_ref/n_r)/10**4, end = ', ')
             v_list.append(l_v_ref)
         print('')
-    print ('ok')
-    v_list.append(l_v_lin(df, vals,beta))
+
+    print('ok')
+    v_list.append(l_v_lin(df, vals, beta))
     vals3 = np.where(vals == 0.0, np.nan, vals)
     plt.figure(figsize=(6, 8))
     plt.style.use('default')
@@ -421,9 +452,9 @@ def fit_type_y_lin(df_o, epoch = 50, rep = 30,m_ref = 1, vals = None, beta = Non
         plt.barh(
             list_ac,
             vals3,
-            tick_label=[dico2_inv[ac] for ac in list_ac]
-        )
-    plt.xlabel("Retirement coefficient")  # optionnel
+            tick_label=[dico2_inv[ac] for ac in list_ac])
+    plt.xlabel("Retirement coefficient")
+    plt.yticks(fontsize=8)
     plt.tight_layout()
     plt.show()
     plt.plot(v_list)
