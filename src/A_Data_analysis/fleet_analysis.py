@@ -11,6 +11,7 @@ label_colors = {
     3.0: 'darkturquoise',
     0.0: colors_5[3],
 }
+label_names = {0.0: 'Very old', 1.0: 'Old', 2.0:'Medium', 3.0:'Modern'}
 import matplotlib.ticker as mtick
 
 
@@ -168,7 +169,7 @@ def visu_prod(df, mapping = mapping_engines,y_ref = 1970, reso = 1, title = 'fle
     x_min = x_max-50
     x_ticks = np.arange(1960, 2030, 5)
     plt.xticks(x_ticks, x_ticks)
-    plt.title("Evolution of the fleet composition, per technology")
+    plt.title("Fleet composition, per technology, "+str(int(x_max)))
     plt.xlabel("Year")
     plt.ylim(ymin=0, ymax=1600)
     if xmax is not None:
@@ -180,6 +181,127 @@ def visu_prod(df, mapping = mapping_engines,y_ref = 1970, reso = 1, title = 'fle
     plt.legend(loc='upper left', title="Engine technology")
     plt.grid(axis='y', linestyle='--', alpha=0.5)
     plt.savefig('figures/fleet_figures/gif_factory/' + title + '.png', format='png')
+    plt.close()
+
+
+def visu_prod2(df, mapping=mapping_engines, y_ref=1970, reso=1,
+               title='fleet_prod_ex', xmax=None):
+
+    df = df.copy()
+    df['gen'] = df['Engine'].map(mapping)
+
+    deliveries = df[['gen', 'Delivery Date']].copy()
+    deliveries['Delivery Date'] = (
+        ((deliveries['Delivery Date'] - y_ref) / reso).astype(int) * reso + y_ref
+    )
+    deliveries['change'] = 1
+    deliveries = deliveries.rename(columns={'Delivery Date': 'date'})
+
+    daily_changes = (
+        deliveries.groupby(['date', 'gen'])['change']
+        .sum()
+        .reset_index()
+    )
+
+    history = (
+        daily_changes
+        .pivot(index='date', columns='gen', values='change')
+        .fillna(0)
+    )
+
+    sorted_cols = sorted(history.columns, reverse=True)
+    history = history[sorted_cols]
+
+    # ------------------ Figure ------------------
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+
+    colors = [label_colors[col] for col in history.columns]
+    labels = [label_names[col] for col in history.columns]
+    ax.stackplot(
+        history.index,
+        [history[col] for col in history.columns],
+        labels=labels,
+        colors=colors,
+        alpha=0.8
+    )
+
+    x_max = history.index.max()
+    x_min = x_max - 50
+
+    ax.set_title(f"Fleet composition per engine technology: {int(x_max)}", fontsize = 14)
+    ax.set_ylabel("# Aircraft", fontsize=14)
+    ax.set_ylim(0, 1600)
+
+    # Axe principal (années)
+    x_ticks = np.arange(5*int((x_min+6.5)/5), 2030, 5)
+    ax.set_xticks(x_ticks)
+    if xmax is not None:
+        xmin = xmax - (x_max - x_min)
+        xmax_plot = xmax
+    else:
+        xmin = x_min
+        xmax_plot = x_max
+
+    ax.set_xlim(xmax_plot, xmin)   # limites inversées
+    # (inutile d'appeler invert_xaxis())
+
+    # ---------------- Axe secondaire ----------------
+
+    # ---------------- Axe secondaire (âge en bas) ----------------
+
+    secax = ax.secondary_xaxis(
+        'bottom',
+        functions=(
+            lambda x: xmax_plot - x,  # année -> âge
+            lambda x: xmax_plot - x  # inverse
+        )
+    )
+
+    # Même positions que l'axe principal
+    top_ticks = np.arange(0, xmax_plot - xmin + 1, 5)
+    secax.set_xticks(top_ticks)
+    secax.set_xlabel('')
+
+    # Ticks plus longs, en arrière-plan visuel
+    secax.tick_params(
+        axis='x',
+        which='major',
+        length=22,  # plus long que les ticks des années
+        width=1,
+        pad= 5,  # éloigne les nombres de l'axe
+        direction='out', labelsize = 13
+    )
+
+    # Ticks des années plus courts et plus proches de l'axe principal
+    ax.tick_params(
+        axis='x',
+        which='major',
+        length=5,
+        pad=2,
+        direction='out',
+        color = '0.5', labelcolor='0.5', labelsize=10
+    )
+
+    # Masquer la ligne de l'axe secondaire pour ne garder que les grands repères
+    secax.spines['bottom'].set_visible(False)
+
+    # ---------------- Finition ----------------
+
+    ax.legend(loc='upper right', title="Engine technology", framealpha = 1, title_fontsize = 13)
+    ax.grid(axis='y', linestyle='--', alpha=0.5)
+    secax.set_xlabel("Production year & Age", fontsize = 14)
+    for label in ax.get_xticklabels():
+        label.set_bbox(dict(
+            facecolor='white',
+            edgecolor='none',
+            boxstyle='square,pad=0.15'
+        ))
+    plt.tight_layout()
+    plt.savefig(
+        f'figures/fleet_figures/gif_factory/{title}.png',
+        format='png'
+    )
     plt.close()
 
 def visu_retirements(df, mapping = mapping_engines, reso_1 = 1, reso_2 = 1, title = 'fleet_retirements_ex'):
