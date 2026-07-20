@@ -5,6 +5,12 @@ import matplotlib as mpl
 import warnings
 from src.Common_tools.vis_ref import colors_5, colors_10,colors_22, colors_26, vis_colors
 import numpy as np
+label_colors = {
+    2.0: 'gold',
+    1.0: colors_5[1],
+    3.0: 'darkturquoise',
+    0.0: colors_5[3],
+}
 import matplotlib.ticker as mtick
 
 
@@ -128,16 +134,16 @@ def visu_fleet(df, mapping = mapping_engines, title = 'fleet_ex'):
     plt.legend(loc='upper left', title="Generation")
     plt.grid(axis='y', linestyle='--', alpha=0.5)
     plt.tight_layout()
-    plt.savefig('figures/fleet_figures' + title + '.pdf', format='pdf')
+    plt.savefig('figures/fleet_figures/' + title + '.png', format='png')
     plt.close()
 
-def visu_prod(df, mapping = mapping_engines, reso = 1, title = 'fleet_prod_ex'):
+def visu_prod(df, mapping = mapping_engines,y_ref = 1970, reso = 1, title = 'fleet_prod_ex', xmax = None):
     df = df.copy()
     df['gen'] = df['Engine'].map(mapping)
 
     deliveries = df[['gen', 'Delivery Date']].copy()
-    deliveries['Delivery Date'] = ((deliveries['Delivery Date']-1970)/reso).astype(int)*reso+1970+reso/2
-
+    deliveries['Delivery Date'] = ((deliveries['Delivery Date']-y_ref)/reso).astype(int)*reso+y_ref
+    # deliveries['Delivery Date'] = ((deliveries['Delivery Date'] - 1970) / reso).astype(int) * reso + 1970 + reso / 2
     deliveries['change'] = 1 #possibility to weight by the number of available seats, if it is in the dataset
     deliveries = deliveries.rename(columns={'Delivery Date': 'date'})
 
@@ -148,26 +154,32 @@ def visu_prod(df, mapping = mapping_engines, reso = 1, title = 'fleet_prod_ex'):
     history = history[sorted_cols]
 
     # 6. Visualisation avec stackplot (équivalent cumulé de fill_between)
-    plt.figure(figsize=(9, 5))
+    plt.figure(figsize=(10, 5))
 
-    # stackplot prend les x (index) et les y (les valeurs de chaque colonne)
-    plt.stackplot(history.index,
-                  [history[col] for col in history.columns],
-                  labels=history.columns, colors=colors_10,
-                  alpha=0.8)
+    colors = [label_colors[col] for col in history.columns]
+    plt.stackplot(
+        history.index,
+        [history[col] for col in history.columns],
+        labels=history.columns,
+        colors=colors,
+        alpha=0.8
+    )
     x_max = history.index.max()
-    x_min = 1970
-    x_ticks = np.arange(x_min, x_max + 1, 5)
+    x_min = x_max-50
+    x_ticks = np.arange(1960, 2030, 5)
     plt.xticks(x_ticks, x_ticks)
-    plt.title("Delivery volumes per generation")
+    plt.title("Evolution of the fleet composition, per technology")
     plt.xlabel("Year")
-    plt.ylim(ymin=0)
-    plt.xlim(xmin=x_min, xmax=x_max)
-    plt.ylabel("Yearly delivered aircraft")
-    plt.legend(loc='upper left', title="Générations")
+    plt.ylim(ymin=0, ymax=1600)
+    if xmax is not None:
+        plt.xlim(xmin=xmax-x_max+x_min, xmax=xmax)
+
+    else:
+        plt.xlim(xmin=x_min, xmax=x_max)
+    plt.ylabel("Yearly aircraft volume")
+    plt.legend(loc='upper left', title="Engine technology")
     plt.grid(axis='y', linestyle='--', alpha=0.5)
-    plt.tight_layout()
-    plt.savefig('figures/fleet_figures/' + title + '.pdf', format='pdf')
+    plt.savefig('figures/fleet_figures/gif_factory/' + title + '.png', format='png')
     plt.close()
 
 def visu_retirements(df, mapping = mapping_engines, reso_1 = 1, reso_2 = 1, title = 'fleet_retirements_ex'):
@@ -175,8 +187,10 @@ def visu_retirements(df, mapping = mapping_engines, reso_1 = 1, reso_2 = 1, titl
     df['gen'] = df['Engine'].map(mapping)
 
     retirements = df[(df['Event Date'].notna())&(df['Status']=='Written Off')][['gen', 'Delivery Date','Event Date']].copy()
-    retirements['Event Date'] = ((retirements['Event Date']-1990)/reso_1).astype(int)*reso_1+1990+reso_1/2
-    retirements['Delivery Date'] = ((retirements['Delivery Date']-1970)/reso_2).astype(int)*reso_2+1970+reso_2/2
+    # retirements['Event Date'] = ((retirements['Event Date']-1990)/reso_1).astype(int)*reso_1+1990+reso_1/2
+    # retirements['Delivery Date'] = ((retirements['Delivery Date']-1970)/reso_2).astype(int)*reso_2+1970+reso_2/2
+    retirements['Event Date'] = ((retirements['Event Date'] - 1990) / reso_1).astype(int) * reso_1 + 1990
+    retirements['Delivery Date'] = ((retirements['Delivery Date'] - 1970) / reso_2).astype(int) * reso_2 + 1970
     retirements['change'] = 1 #possibility to weight by the number of available seats, if it is in the dataset
     retirements = retirements.rename(columns={'Event Date': 'date'})
 
@@ -225,7 +239,7 @@ def visu_retirements(df, mapping = mapping_engines, reso_1 = 1, reso_2 = 1, titl
     plt.legend(loc='upper left', title="Generations")
     plt.grid(axis='y', linestyle='--', alpha=0.5)
     plt.tight_layout()
-    plt.savefig('figures/fleet_figures/' + title + '.pdf', format='pdf')
+    plt.savefig('figures/fleet_figures/' + title + '.png', format='png')
     plt.close()
 
 def retirement_ranking(df):
@@ -414,7 +428,7 @@ def visu_retirements_array(vol_obs, obs_names, period_duration, n_market,graph_n
     plt.show()
     return None
 
-def constraint_plot(traff_arrays, active_fleet_arrays, ranges_c, title ='test', years = [2024,2050]):
+def constraint_plot(traff_arrays, active_fleet_arrays, ranges_c, title ='test', years = [2024,2050], format = 'pdf'):
     N_p = traff_arrays.shape[0]
     values_to_sort2 = np.array(ranges_c)
     sorted_indices2 = np.argsort(values_to_sort2)
@@ -452,4 +466,4 @@ def constraint_plot(traff_arrays, active_fleet_arrays, ranges_c, title ='test', 
 
     cbar = plt.colorbar(sm, ax=ax)
     cbar.set_label('Year', fontsize = 13)
-    plt.savefig('figures/integrated_observation/scenario/range_constraints/constraint_plot_'+title+'.pdf')
+    plt.savefig('figures/integrated_observation/scenario/range_constraints/constraint_plot_'+title+'.'+format)

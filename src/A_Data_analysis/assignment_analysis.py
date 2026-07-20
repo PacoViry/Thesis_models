@@ -185,11 +185,12 @@ def market_vis(df, name_fig ='test_market', title_fig = None,  color_mix = vis_r
     # for label in clabels1:
     #     label.set_bbox({'facecolor': 'none', 'alpha': 0.9, 'edgecolor': 'none'})
     #     label.set_text(label.get_text() + '%')
-    sizes_markers = (np.array(selec_0[observation]) / market_types[observation].sum())**0.6
+    sizes_markers = 1.5*(np.array(selec_0[observation]) / market_types[observation].sum())**0.6
     for j in range(len(moys)):
-        main_ax.scatter(moys[j][0], moys[j][1], alpha=1, marker='o',
-                        color=color_mix[color_rank[selec[j]]%25], s=1500*sizes_markers[j], linewidth=1, edgecolor='black', zorder=3)
-        main_ax.scatter(moys[j][0], moys[j][1], alpha=1, marker='+', s=1500*sizes_markers[j], linewidth=2*sizes_markers[j]**0.5, color='0.05', zorder=3)
+        if (moys[j][0]>dist_limits[0])&(moys[j][0]<dist_limits[1])&(moys[j][1]>capac_limits[0])&(moys[j][1]<capac_limits[1]):
+            main_ax.scatter(moys[j][0], moys[j][1], alpha=1, marker='o',
+                            color=color_mix[color_rank[selec[j]]%25], s=1500*sizes_markers[j], linewidth=1, edgecolor='black', zorder=3)
+            main_ax.scatter(moys[j][0], moys[j][1], alpha=1, marker='+', s=1500*sizes_markers[j], linewidth=2*sizes_markers[j]**0.5, color='0.05', zorder=3)
     main_ax.set_xlabel('Route distance (km)', fontsize=17, color='darkblue')
     main_ax.set_ylabel('Route capacity (seats/year)', fontsize=17, color='darkred')
     main_ax.set_xscale('log')
@@ -209,11 +210,11 @@ def market_vis(df, name_fig ='test_market', title_fig = None,  color_mix = vis_r
     exponent = int(np.log10(market_types[observation][0]))
     for j in range(len(moys)): #posera peut être un jour problème pour bien garder un ordre correct, ne pas trier et reordonner? (regarder l'ancien code)
         x_density_ax.fill_between(X,res_x_e[j], res_x_e[j+1],color = color_mix[color_rank[selec[j]]%25],
-                    label = str(selec[j]).replace(" ", "")+' ' + str(selec_n[j])+': '+str(int(10**-(exponent-2)*(selec_0[observation][j])+0.5)/100)+'e'+str(exponent)+ ' '+ observation + ', '
+                    label = str(selec[j]).replace(" ", "")+' ' + str(selec_n[j])+': '+str(int(10**-(exponent-2)*(selec_0[observation][j])+0.5)/100)+'e'+str(exponent)+ ', ' #' '+ observation +
                      + str(int(1000*(selec_0[observation][j])/market_types[observation].sum()+0.5)/10)+'%',edgecolor='black', linewidth=0.5)
     x_density_ax.fill_between(X, res_x_e[len(moys)], res_x_e[len(moys) + 1], color='0.5',
                               label= 'Others: ' + str(int(10 ** -(exponent-2) * (
-                              market_types[observation][len(moys):].sum()) + 0.5) / 100) + 'e'+str(exponent)+ ' ' + observation + ', '
+                              market_types[observation][len(moys):].sum()) + 0.5) / 100) + 'e'+str(exponent)+  ', '#' ' + observation +
                                     + str(int(1000 * (market_types[observation][len(moys):].sum()) / market_types[observation].sum() + 0.5) / 10) + '%', edgecolor='black', linewidth=0.5)
     x_density_ax.plot(X, res_x_e[len(moys) + 1], color='0', linewidth=1.5)
 
@@ -231,16 +232,16 @@ def market_vis(df, name_fig ='test_market', title_fig = None,  color_mix = vis_r
             l if l.startswith("Others") else l.split(" ", 1)[1]
             for l in labels
         )
-        leg = x_density_ax.legend(handles, labels, loc='upper left', bbox_to_anchor=(1,1.10), ncols=1,
-                                  fontsize=fontsize_legend,framealpha=1, edgecolor='none',labelspacing=0.3)
+        leg = x_density_ax.legend(handles, labels, loc='upper left', bbox_to_anchor=(0.93,1.1), ncols=int(n_market/25+1),
+                                  fontsize=fontsize_legend,framealpha=0.9, edgecolor='none',labelspacing=0.4)
     else :
         handles, labels = x_density_ax.get_legend_handles_labels()
         labels = tuple(
             l if l.startswith("Others") else l.split(" ", 1)[1]
             for l in labels
         )
-        leg = x_density_ax.legend(handles, labels, loc='upper left', bbox_to_anchor=(1, 1.08), ncols=int(n_market/25+1),
-                                  fontsize=fontsize_legend, framealpha=1, edgecolor='none',labelspacing=0.3)
+        leg = x_density_ax.legend(handles, labels, loc='upper left', bbox_to_anchor=(0.93, 1.1), ncols=int(n_market/25+1),
+                                  fontsize=fontsize_legend, framealpha=0.9, edgecolor='none',labelspacing=0.4)
     leg.set_zorder(5)
 
     x_density_ax.set_ylabel(observation +'\n'+'distribution (1)', fontsize=14)
@@ -287,7 +288,7 @@ def market_vis(df, name_fig ='test_market', title_fig = None,  color_mix = vis_r
             transform=cbar.ax.get_yaxis_transform()
         )
     if title_fig is not None:
-        fig.suptitle(title_fig, fontsize=18, fontweight='bold', y=0.95, x = 0.3, ha = 'left')
+        fig.suptitle(title_fig, fontsize=24, fontweight='bold', y=0.95, x = 0.3, ha = 'left')
     if video:
         plt.savefig('figures/video_storage/'+name_fig+'.png', format = 'png')
     else :

@@ -138,42 +138,42 @@ def compute_fleet_assignment(vol_act, traffic_structures,
 
 
 def observe_scenario(alphas, betas,ranges, omegas, types_names, traffic_structures, period_duration=1, observation = 'Av_ac_seats',
-                     obs_sizes = None, dic_fuel = None, vals_fuel = None,period_ref = None, save_name = 'scenario_test', reso=400):
+                     obs_sizes = None, dic_fuel = None, vals_fuel = None,period_ref = None,add_period = 0, save_name = 'scenario_test', reso=400,label_size_param = 1):
     if period_ref is None :
-        period_ref = omegas.shape[1] - 1
+        period_ref = omegas.shape[0] - 1
     if observation is None :
         print('Av_ac_seats')
         dynamic_pred_vis(traffic_structures, alphas, betas, ranges, omegas, list(range(omegas.shape[0])),
-                         name_periods=None, types_names=types_names,
+                         add_period=add_period, types_names=types_names,
                          video_name=save_name+'_Av_ac_seats', format_v='video', color_mix=vis_ref.colors_26,
                          market='Aircraft Type', observation='Av_ac_seats', dist_limits=(4e2, 1.9e4),
                          capac_limits=(9e3, 4e6),period_duration=period_duration,
-                         frame_s=2, period_ref=period_ref, reso=reso)
+                         frame_s=8, period_ref=period_ref, reso=reso,label_size_param = label_size_param)
         print('ASK')
         dynamic_pred_vis(traffic_structures, alphas, betas, ranges, omegas, list(range(omegas.shape[0])),
-                         name_periods=None, types_names=types_names, obs_sizes=obs_sizes,
+                         add_period=add_period, types_names=types_names, obs_sizes=obs_sizes,
                          video_name='test_sc_obs_market'+'_ASK', format_v='video', color_mix=vis_ref.colors_26,
-                         market='Aircraft Type', observation='ASK', dist_limits=(4e2, 1.9e4),
-                         capac_limits=(9e3, 4e6),period_duration=period_duration,
-                         frame_s=2, period_ref=period_ref, reso=reso)
+                         market='Aircraft Type', observation='ASK', dist_limits=(4.9e2, 1.9e4),
+                         capac_limits=(1.9e4, 6e6),period_duration=period_duration,
+                         frame_s=8, period_ref=period_ref, reso=reso,label_size_param = label_size_param)
         print('FB')
         dynamic_pred_vis(traffic_structures, alphas, betas, ranges, omegas, list(range(omegas.shape[0])),
-                         name_periods=None, types_names=types_names,obs_sizes=obs_sizes,
+                         add_period=add_period, types_names=types_names,obs_sizes=obs_sizes,
                          video_name='test_sc_obs_market'+'_FB', format_v='video', color_mix=vis_ref.colors_26,
-                         market='Aircraft Type', observation='FB', dist_limits=(4e2, 1.9e4),
-                         capac_limits=(9e3, 4e6), frame_s=2, period_ref=0,period_duration=period_duration,
-                         dic_fuel = dic_fuel, vals_fuel = vals_fuel, reso=reso)
+                         market='Aircraft Type', observation='FB', dist_limits=(4.9e2, 1.9e4),
+                         capac_limits=(1.9e4, 6e6), frame_s=8, period_ref=0,period_duration=period_duration,
+                         dic_fuel = dic_fuel, vals_fuel = vals_fuel, reso=reso,label_size_param = label_size_param)
         return None
     elif observation not in ['Av_ac_seats', 'ASK', 'FB']:
         print('observation not recognized.')
         print('observation must be in [Av_ac_seats, ASK, FB].or N_flights or Seats if the code is updated.')
         return None
     dynamic_pred_vis(traffic_structures, alphas, betas, ranges, omegas, list(range(omegas.shape[0])),
-                        name_periods=None, types_names=types_names,obs_sizes=obs_sizes,
+                        add_period=add_period, types_names=types_names,obs_sizes=obs_sizes,
                          video_name=save_name+'_'+observation, format_v='video', color_mix=vis_ref.colors_26,
-                         market='Aircraft Type', observation=observation, dist_limits=(4e2, 1.9e4),
-                         capac_limits=(9e3, 4e6), frame_s=2, period_ref=period_ref,period_duration=period_duration,
-                         dic_fuel = dic_fuel, vals_fuel = vals_fuel, reso=reso)
+                         market='Aircraft Type', observation=observation, dist_limits=(4.9e2, 1.9e4),
+                         capac_limits=(1.9e4, 6e6), frame_s=8, period_ref=period_ref,period_duration=period_duration,
+                         dic_fuel = dic_fuel, vals_fuel = vals_fuel, reso=reso,label_size_param = label_size_param)
     return None
 
 def create_df(traff, alphas,betas, omegas_p, ranges,types_names):
@@ -206,13 +206,12 @@ def create_df(traff, alphas,betas, omegas_p, ranges,types_names):
     df_visu['Aircraft Type Name'] = df_visu['Aircraft Type'].map(dico_names)
     return df_visu
 
-def dynamic_pred_vis(traff_structures, alphas, betas, ranges, omegas, periods, obs_sizes = None, types_names = None, name_periods = None,
+def dynamic_pred_vis(traff_structures, alphas, betas, ranges, omegas, periods, obs_sizes = None, types_names = None, add_period = None,
                      video_name = 'test_video_market', format_v = 'gif', color_mix = vis_ref.colors_26,
                      market = 'Aircraft Type',observation = 'Av_ac_seats', dist_limits = (4e2, 1.9e4), capac_limits = (9e3, 5e6),
-                     frame_s = 2, period_ref = None, n_market = 18,reso = 400, smooth_param = 0.04,
+                     frame_s = 2, period_ref = None, n_market = 33,reso = 400, smooth_param = 0.04,
                      period_duration = 1,label_size_param = 1,dic_fuel = None, vals_fuel = None):
-    if name_periods is None:
-       name_periods = periods
+    name_periods = periods
     if types_names is None:
        types_names = list(range(omegas.shape[2]))
     if period_ref is None:
@@ -377,7 +376,7 @@ def dynamic_pred_vis(traff_structures, alphas, betas, ranges, omegas, periods, o
             df_p = assignment_analysis.agg_ind_s(df_p, observation='FB')
         assignment_analysis.market_vis(df_p,name_fig ='video_'+str(100+i), color_mix = color_mix, rank = rank, color_rank = sol,
                    market = market, observation = observation, dist_limits = dist_limits, capac_limits = capac_limits, n_market = n_market,
-                   m_x_ref= traff_x_max, m_y_ref = traff_y_max, ask_d_ref = ask_max, video = True, title_fig = name_periods[i],
+                   m_x_ref= traff_x_max, m_y_ref = traff_y_max, ask_d_ref = ask_max, video = True, title_fig = name_periods[i]+add_period,
                     smooth_param = smooth_param, weight = None, reso = reso,label_size_param=label_size_param)
 
     #Animation des images
