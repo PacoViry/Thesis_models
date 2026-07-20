@@ -267,7 +267,7 @@ def visu_prod2(df, mapping=mapping_engines, y_ref=1970, reso=1,
     secax.tick_params(
         axis='x',
         which='major',
-        length=22,  # plus long que les ticks des années
+        length=23,  # plus long que les ticks des années
         width=1,
         pad= 5,  # éloigne les nombres de l'axe
         direction='out', labelsize = 13
@@ -277,8 +277,9 @@ def visu_prod2(df, mapping=mapping_engines, y_ref=1970, reso=1,
     ax.tick_params(
         axis='x',
         which='major',
-        length=5,
-        pad=2,
+        length=4,
+        width=1,
+        pad=3,
         direction='out',
         color = '0.5', labelcolor='0.5', labelsize=10
     )
@@ -295,12 +296,12 @@ def visu_prod2(df, mapping=mapping_engines, y_ref=1970, reso=1,
         label.set_bbox(dict(
             facecolor='white',
             edgecolor='none',
-            boxstyle='square,pad=0.15'
+            boxstyle='ellipse,pad=0.08', alpha = 0.9
         ))
     plt.tight_layout()
     plt.savefig(
         f'figures/fleet_figures/gif_factory/{title}.png',
-        format='png'
+        format='png', dpi = 200
     )
     plt.close()
 
