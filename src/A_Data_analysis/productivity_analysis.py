@@ -647,7 +647,7 @@ def visu_flight_streaks(array, min_fh = 0.5, max_fh = 14, reso = 200, sigma = 0.
     y_l_s_merged = np.cumsum(y_l_s_merged, axis=0)
     y_l_s_merged_f = 100 * y_l_s_merged / y_l_s_merged[-1, :]
 
-    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, sharex=True, height_ratios=[3, 3, 3], figsize=(7, 8))
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, sharex=True, height_ratios=[3, 3, 3], figsize=(7, 10))
 
     for i in range(len(order_unique) - 1):
         ax2.fill_between(np.exp(x_grid), y_l_i_merged_f[i], y_l_i_merged_f[i + 1], label=F_merged[i + 1], linewidth=0.2,

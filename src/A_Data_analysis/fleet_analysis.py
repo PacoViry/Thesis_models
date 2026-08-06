@@ -229,7 +229,7 @@ def visu_prod2(df, mapping=mapping_engines, y_ref=1970, reso=1,
     x_max = history.index.max()
     x_min = x_max - 50
 
-    ax.set_title(f"Fleet composition per engine technology: {int(x_max)}", fontsize = 14)
+    ax.set_title(f"Fleet composition per engine technology: {int(x_max-1)}", fontsize = 14)
     ax.set_ylabel("# Aircraft", fontsize=14)
     ax.set_ylim(0, 1600)
 
