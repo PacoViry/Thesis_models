@@ -3,6 +3,8 @@ import numpy as np
 import random as rd
 import matplotlib.pyplot as plt
 import seaborn as sns
+from src.Common_tools import vis_ref
+
 ### the entry dataset is composed of several columns : 'Aircraft Type','Engine', 'Delivery Date', 'Status', 'Event Date'
 ### Status vaut written off, stored ou active
 ### Each column describes an engine which is or was part of the fleet
@@ -170,7 +172,7 @@ def l_v(liste_r, params):
         probs[mod, mill] += -propensions[mod, mill]
     return llike
 
-def fit_type_y(df_o, epoch = 50, rep = 30, vals = None, n_ac = None, title = 'TAA_free'):
+def fit_type_y(df_o, epoch = 50, rep = 30, vals = None, n_ac = None, title = 'TAA_free', y_min=0):
     df = df_o.copy()
     n_r = df['rank'].max()
     df['Delivery Date'] = df['Delivery Date'].astype(int)
@@ -221,9 +223,63 @@ def fit_type_y(df_o, epoch = 50, rep = 30, vals = None, n_ac = None, title = 'TA
     print('ok')
     v_list.append(l_v(df, vals))
     vals3 = np.where(vals == 0.0, np.nan, vals)
-    for j in range(len(list_ac)):
-        plt.scatter(np.array(list_dates), vals3[j, :], label=list_ac[j])
-    plt.savefig('figures//estimators_figures//retir_propensions_'+title+'.png')
+
+    rd_file = random_list(df, vals)
+    list_ac2 = sorted(rd_file['Aircraft Type'].unique())
+    list_dates = sorted(rd_file['Delivery Date'].unique())
+    pivot_table = (rd_file[['Aircraft Type', 'Delivery Date', 'rank']].pivot_table(values='rank',
+                                                                                   index='Aircraft Type',
+                                                                                   columns='Delivery Date',
+                                                                                   aggfunc='count',
+                                                                                   fill_value=0)
+                   .reindex(index=list_ac2, columns=list_dates, fill_value=0))
+    pivot_table.sort_index(axis=0, inplace=True)
+    pivot_table.sort_index(axis=1, inplace=True)
+    flotte = pivot_table.to_numpy()
+    flotte[flotte<10] = 0 #for clarity
+
+    rd_file_r = rd_file[rd_file['rank']<n_r]# retired aircraft
+    pivot_table_r = (rd_file_r[['Aircraft Type', 'Delivery Date', 'rank']].pivot_table(values='rank',
+                                                                                   index='Aircraft Type',
+                                                                                   columns='Delivery Date',
+                                                                                   aggfunc='count',
+                                                                                   fill_value=0)
+                   .reindex(index=list_ac2, columns=list_dates, fill_value=0))
+    pivot_table_r.sort_index(axis=0, inplace=True)
+    pivot_table_r.sort_index(axis=1, inplace=True)
+    flotte_r = pivot_table_r.to_numpy()
+    flotte[flotte_r < 5] = 0  # for validity
+    flotte_r[flotte<20] = 0
+
+    plt.xlabel('Production year', fontsize=19)
+    plt.ylabel(r"  $\hat{\alpha}_{model,year}$", fontsize=18)
+
+    sns.set(style="whitegrid")
+    plt.gcf().set_size_inches(12.7, 12.1)
+
+    plt.grid(True, linestyle='--', alpha=0.7)
+    order = np.argsort(np.sum(flotte_r, axis=1))
+
+    for z, j in enumerate(order[::-1]):
+        plt.scatter(
+            np.array(list_dates) + y_min,
+            vals3[j, :],
+            label=list_ac[j],
+            s=vis_ref.sizes[z // 25] / 8 * flotte_r[j, :]**0.9,
+            marker=vis_ref.marker_type[z // 25],
+            color=vis_ref.colors_26[z % 25],
+            edgecolors='black',
+            linewidth=0.75
+        )
+    plt.xticks(fontsize=14)
+    plt.yticks(fontsize=14)
+    legend = plt.legend(bbox_to_anchor=(1.0, 1.02), fontsize=11, framealpha=0, ncol=2, loc='upper left')
+    for handle in legend.legend_handles:
+        handle.set_sizes([100])  # Méthode propre pour définir la taille des marqueurs
+    plt.ylim(-4.1,2.5)
+    plt.xlim(1979,2010)
+    plt.subplots_adjust(right=0.68)  # Pour laisser de la place à la légende à droite
+    plt.savefig('figures//estimators_figures//retir_propensions_'+title+'_b.svg', format='svg')
     plt.show()
     plt.plot(v_list)
     plt.show()
@@ -262,6 +318,7 @@ def setting_df_lin(ac_df):
     file_f = pd.concat([df_r, df_a_filtered])
     file_f.reset_index(inplace= True, drop=True)
     return file_f
+
 
 def random_list_lin(liste_r, params, beta):
     list_dates = sorted(liste_r['Delivery Date'].unique())
@@ -443,19 +500,75 @@ def fit_type_y_lin(df_o, epoch = 50, rep = 30, vals = None, beta = None,dico2_in
     print('ok')
     v_list.append(l_v_lin(df, vals, beta))
     vals3 = np.where(vals == 0.0, np.nan, vals)
-    plt.figure(figsize=(6, 8))
-    plt.style.use('default')
-    plt.grid(axis='both')
+    sns.set(style="whitegrid")
+
     if dico2_inv is None:
-        plt.barh(list_ac, vals3)
+        labels = list_ac
     else:
-        plt.barh(
-            list_ac,
-            vals3,
-            tick_label=[dico2_inv[ac] for ac in list_ac])
-    plt.xlabel("Retirement coefficient")
-    plt.yticks(fontsize=8)
-    plt.tight_layout()
+        labels = [dico2_inv[ac] for ac in list_ac]
+
+    # Séparation en deux groupes
+    n = len(labels)
+    mid = (n + 1) // 2
+
+    labels_left = labels[:mid][::-1]
+    labels_right = labels[mid:][::-1]
+
+    vals_left = vals3[:mid][::-1]
+    vals_right = vals3[mid:][::-1]
+
+    # Même échelle x pour les deux graphes
+    xmin = min(np.min(vals_left), np.min(vals_right))
+    xmax = max(np.max(vals_left), np.max(vals_right))
+
+    fig, axes = plt.subplots(
+        1, 2,
+        figsize=(12.5, 10),
+        sharex=True
+    )
+
+    for ax, labels_i, vals_i in zip(
+            axes,
+            [labels_left, labels_right],
+            [vals_left, vals_right]
+    ):
+        ax.barh(
+            labels_i,
+            vals_i,
+            edgecolor='black',
+            linewidth=0.75
+        )
+
+        ax.axvline(0, color='black', linewidth=1)
+
+        ax.grid(
+            axis='y',
+            linestyle='--',
+            alpha=0.6
+        )
+        ax.grid(
+            axis='x',
+            linestyle='-',
+            alpha=0.6
+        )
+
+        ax.set_xlim(xmin-0.1, xmax+0.1)
+
+        ax.tick_params(axis='x', labelsize=14)
+        ax.tick_params(direction='in', axis='y', labelsize=12)
+
+    # Label commun
+    fig.supxlabel("Type-specific coefficient", fontsize=18)
+
+    plt.subplots_adjust(
+        left=0.08,
+        right=0.98,
+        top=0.98,
+        bottom=0.10,
+        wspace=0.25
+    )
+    plt.savefig('figures//estimators_figures//retir_propensions_types_b.pdf', format='pdf')
+
     plt.show()
     plt.plot(v_list)
     plt.show()
