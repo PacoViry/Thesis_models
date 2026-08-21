@@ -477,7 +477,6 @@ def fit_type_y_lin(df_o, epoch = 50, rep = 30, vals = None, beta = None,dico2_in
         # one Adam update per mini-batch
         for q in range(1, rep):
             grad_vals, grad_beta = grad_minibatch_lin(rd_file, vals, beta)
-
             t += 1
             m_vals = beta1 * m_vals + (1 - beta1) * grad_vals
             v_vals = beta2 * v_vals + (1 - beta2) * (grad_vals ** 2)
@@ -499,7 +498,7 @@ def fit_type_y_lin(df_o, epoch = 50, rep = 30, vals = None, beta = None,dico2_in
 
     print('ok')
     v_list.append(l_v_lin(df, vals, beta))
-    vals3 = np.where(vals == 0.0, np.nan, vals)
+    vals3 = vals-vals.mean()
     sns.set(style="whitegrid")
 
     if dico2_inv is None:
@@ -558,7 +557,7 @@ def fit_type_y_lin(df_o, epoch = 50, rep = 30, vals = None, beta = None,dico2_in
         ax.tick_params(direction='in', axis='y', labelsize=12)
 
     # Label commun
-    fig.supxlabel("Type-specific coefficient", fontsize=18)
+    fig.supxlabel("Type-specific coefficients", fontsize=18)
 
     plt.subplots_adjust(
         left=0.08,
