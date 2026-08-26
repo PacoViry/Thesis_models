@@ -43,8 +43,8 @@ colors_26 = [
     "#D100D1",  # fuchsia
     "#000000",  # noir
 ]
-marker_type = ['s','o','^','P','x','*']
-sizes = [30,30,35,40,40,60]
+marker_type = ['s','o','^','P','X','*','x']
+sizes = [30,30,35,40,40,60,50]
 symb = ['o', 's', '^', 'v', '<', '>', 'd', 'p', 'h', '*', 'D', 'x', 'P', 'h', '8']
 
 ## Visualisation des couleurs

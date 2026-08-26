@@ -6,6 +6,8 @@ import seaborn as sns
 from scipy.stats import wasserstein_distance
 from scipy.optimize import minimize
 from matplotlib.ticker import ScalarFormatter
+import matplotlib.lines as mlines
+from matplotlib.legend_handler import HandlerTuple
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error, r2_score
 # import time as tm
@@ -90,7 +92,7 @@ def data_formatting(df, seuils_f = 0.01, n_ac = 60, obs = 'ASK', weight = True, 
     )
     binary_table = (contingency_table > 0).astype(int)
     aircraft_existence_cache = np.array(binary_table)
-    return df_f2[add+['Period', 'Distance_conn (km)', 'Seats_conn_p', obs+'_conn_p', 'Id_mod', obs + '_w']], corr_table, aircraft_existence_cache, max_dist, conn
+    return df_f2[add+['Period', 'Distance_conn (km)', 'Seats_conn_p', obs+'_conn_p', 'Id_mod', obs + '_w']], corr_table, aircraft_existence_cache, max_dist, conn, unique_ids
 
 def log_likelihood_1_0(data_batch, cache, alphas, betas, omegas, ranges):
     us = (alphas[:, None] * data_batch[:, 1] + betas[:, None] * data_batch[:, 2]) + omegas[
@@ -330,8 +332,11 @@ def correspondance_table(title_coeffs = 'logit_model_bts_35_5_1_9',title_tech = 
         ['Aircraft Type Name', obs_choice + '_weight', 'Est_avg_seats', 'Est_max_range']].set_index(
         'Aircraft Type Name')
     tech_table['Aircraft Type Name'] = tech_table.index
-    data_table = pd.merge(tech_table, coeffs, how = 'left', left_index=True, right_index=True)
-    # p_min = int(np.log10(data_table[obs_choice + '_weight'].min())) #Pour normaliser, ici on l'enlève pour avoir une estimation réaliste pour le nombre d'avion neufs équivalents.
+
+    data_table = pd.concat(
+        [tech_table, coeffs.set_axis(tech_table.index)],
+        axis=1
+    )    # p_min = int(np.log10(data_table[obs_choice + '_weight'].min())) #Pour normaliser, ici on l'enlève pour avoir une estimation réaliste pour le nombre d'avion neufs équivalents.
     # data_table[obs_choice + '_weight'] = data_table[obs_choice + '_weight'] / 10 ** p_min
     return data_table
 
@@ -466,7 +471,7 @@ def nwsd(aircraft_existence, training_data, conn_data, pots, d_norm, cap_norm, o
     return(None)
 
 def visu_coeffs(alphas, betas, names_ac,ds_name, d_norm = 1, cap_norm = 1):
-    plt.figure(figsize=(5.5, 5.5))
+    plt.figure(figsize=(7.5, 5.5))
     plt.grid(True, linestyle='--', linewidth=0.3, color='gray')
     n_ac = len(names_ac)
     n_colors = min(10,-int(np.floor(-n_ac/6)))
@@ -476,16 +481,48 @@ def visu_coeffs(alphas, betas, names_ac,ds_name, d_norm = 1, cap_norm = 1):
     alphas = np.array(df_visu['alphas'])
     betas = np.array(df_visu['betas'])
     names_ac = df_visu.index.to_list()
-    for i in range(min(len(names_ac),59)):
+    for i in range(min(len(names_ac),58)):
         plt.scatter(alphas[i]/d_norm,betas[i]/cap_norm, s=1.5*vis_ref.sizes[i // n_colors], color=colors[i % n_colors], marker= vis_ref.marker_type[i // n_colors],
                     label= names_ac[i][:30], edgecolors='black', linewidth=0.5)
-    plt.legend(markerscale=1.3, scatterpoints=1, ncol = n_col, bbox_to_anchor=(1, 1))
+    # handles, labels = plt.gca().get_legend_handles_labels()
+    # legend1 = plt.legend(handles=handles, labels=labels,
+    #                      framealpha=1, fontsize=11,
+    #                      bbox_to_anchor=(1.01, 1.01), ncols=3,
+    #                      title='Measured assignment parameters')
+
+    plt.legend(framealpha=1, fontsize=11, bbox_to_anchor=(1.01, 1.02), ncols=3,
+               title='Measured assignment parameters',labelspacing=0.1, title_fontsize = 13)
     plt.gca().xaxis.set_major_formatter(ScalarFormatter(useMathText=True))
     plt.gca().xaxis.get_major_formatter().set_scientific(True)
     plt.gca().xaxis.get_major_formatter().set_powerlimits((-1, 1))
-    plt.xlabel('Impact of distance', fontsize=14)
-    plt.ylabel('Impact of log(capacity)', fontsize=14)
+    plt.xlabel(r'$\beta_1$ : Impact of distance on logistic score', fontsize=14)
+    plt.ylabel(r'$\beta_2$ : Impact of log(capacity) on logistic score', fontsize=14)
     plt.savefig('figures//estimators_figures//estim_model_' +ds_name+'.pdf', bbox_inches="tight", format='pdf')
+    plt.show()
+
+def visu_seat_ranges(ranges, seats, names_ac, ds_name, d_norm=1, cap_norm=1):
+    plt.figure(figsize=(10, 5.5))
+    plt.grid(True, linestyle='--', linewidth=0.3, color='gray')
+    n_ac = len(names_ac)
+    n_colors = min(10, -int(np.floor(-n_ac / 6)))
+    n_col = (n_ac - 1) // 19 + 1
+    colors = vis_ref.colors_10[:n_colors]
+    df_visu = pd.DataFrame({'alphas': ranges, 'betas': seats}, index=names_ac).sort_index()
+    alphas = np.array(df_visu['alphas'])
+    betas = np.array(df_visu['betas'])
+    names_ac = df_visu.index.to_list()
+    for i in range(min(len(names_ac), 58)):
+        plt.scatter(alphas[i] / d_norm, betas[i] / cap_norm, s=1.5 * vis_ref.sizes[i // n_colors],
+                    color=colors[i % n_colors], marker=vis_ref.marker_type[i // n_colors],
+                    label=names_ac[i][:30], edgecolors='black', linewidth=0.5)
+
+    # plt.legend(framealpha=1, fontsize=11, bbox_to_anchor=(1.01, 1.02), ncols=3,
+    #            title='Aircraft type', labelspacing=0.1, title_fontsize=13)
+    plt.xlabel(r'Estimated maximum range (km)', fontsize=14)
+    plt.ylabel(r'Average seat capacity', fontsize=14)
+    plt.xlim((0,18000))
+    plt.ylim((0,500))
+    plt.savefig('figures//estimators_figures//range_seats_' + ds_name + '.pdf', format='pdf')
     plt.show()
 
 def regressor_assign_coeffs(c_table, weight = False, weight_log = False, obs_choice = 'ASK', visu = True):
@@ -496,8 +533,8 @@ def regressor_assign_coeffs(c_table, weight = False, weight_log = False, obs_cho
     y1 = c_table['alphas'] #variable with heteroscedasticity. Problématic in our case. We try here to weight with the log (optionnal)
     y2 = c_table['betas']
     if weight :
-        p_max = int(np.log10(c_table[obs_choice + '_w'].max()))
-        weight_c2 = c_table[obs_choice + '_w']/10**(p_max-2)
+        p_max = int(np.log10(c_table[obs_choice + '_weight'].max()))
+        weight_c2 = c_table[obs_choice + '_weight']/10**(p_max-2)
         if weight_log :
             d_min=c_table['Est_max_range'].min()
             weight_c1 = weight_c2*np.log1p(c_table['Est_max_range'].values/d_min)
@@ -522,10 +559,19 @@ def regressor_assign_coeffs(c_table, weight = False, weight_log = False, obs_cho
         print(f"R^2 : {r2:.3f}")
         plt.scatter(y_pred, y1, color='blue', alpha=0.8, label='Aircraft type', s=weight_c1)
         plt.plot([min(y1), max(y1)], [min(y1), max(y1)], color='red', linestyle='--', label='y = x')
-        plt.ylabel(r'$\alpha_j$: Real assignment parameter', fontsize=16)
-        plt.xlabel(r'$\hat{\alpha_j}$: Predicted assignment parameter', fontsize=16)
-        plt.legend(fontsize=18, framealpha=1)
+        plt.ylabel(r'$\beta_1$: Real parameter', fontsize=17)
+        plt.xlabel(r'$\hat{\beta_1}$: Predicted parameter', fontsize=17)
+        plt.legend(fontsize=16, framealpha=1)
         plt.grid(True)
+        plt.text(
+            0.05, 0.95,
+            f"MSE : {10 ** 8 * mse:.3f}e-8\n$R^2$ : {r2:.3f}",
+            transform=plt.gca().transAxes,
+            fontsize=17,
+            verticalalignment='top',
+            bbox=dict(facecolor='white', alpha=1, edgecolor='black')
+        )
+        plt.savefig('figures//estimators_figures//visu_regressor_beta1.pdf', bbox_inches="tight",format='pdf')
         plt.show()
 
     model2 = LinearRegression()
@@ -539,10 +585,19 @@ def regressor_assign_coeffs(c_table, weight = False, weight_log = False, obs_cho
         print(f"R^2 : {r2:.3f}")
         plt.scatter(y_pred, y2, color='blue', alpha=0.8, label='Aircraft type', s=weight_c2)
         plt.plot([min(y2), max(y2)], [min(y2), max(y2)], color='red', linestyle='--', label='y = x')
-        plt.ylabel(r'$\beta_j$: Real assignment parameter', fontsize=16)
-        plt.xlabel(r'$\hat{\beta_j}$: Predicted assignment parameter', fontsize=16)
-        plt.legend(fontsize=18, framealpha=1)
+        plt.ylabel(r'$\beta_2$: Real parameter', fontsize=17)
+        plt.xlabel(r'$\hat{\beta_2}$: Predicted parameter', fontsize=17)
+        plt.legend(fontsize=16, framealpha=1)
         plt.grid(True)
+        plt.text(
+            0.05, 0.95,
+            f"MSE : {10 ** 1 * mse:.3f}e-1\n$R^2$ : {r2:.3f}",
+            transform=plt.gca().transAxes,
+            fontsize=17,
+            verticalalignment='top',
+            bbox=dict(facecolor='white', alpha=1, edgecolor='black')
+        )
+        plt.savefig('figures//estimators_figures//visu_regressor_beta2.pdf', bbox_inches="tight",format='pdf')
         plt.show()
     return np.concatenate([np.array([model1.intercept_]),model1.coef_]), np.concatenate([np.array([model2.intercept_]),model2.coef_])
 
@@ -555,9 +610,9 @@ def regressor_visu_model(c_table, alphas_coeff, betas_coeff, reg_name='test'):
     p_d = 20
     p_s = 3
     u = 0
-    for sqrt_range in np.linspace(1000.05 ** (1 / p_d), 18000.5 ** (1 / p_d), 19):
+    for sqrt_range in np.linspace(2000.05 ** (1 / p_d), 18000.5 ** (1 / p_d), 19):
         ranges = 50 * int(sqrt_range ** p_d / 50)
-        inputs = np.array([ranges * np.ones(700), np.linspace(40.5 ** (1 / p_s), 700.5 ** (1 / p_s), 700) ** p_s]).T
+        inputs = np.array([ranges * np.ones(500), np.linspace(40.5 ** (1 / p_s), 500.5 ** (1 / p_s), 500) ** p_s]).T
         sample_x = np.concatenate((inputs, np.log(inputs), 1 / inputs), axis=1)
         alphas_sample = alphas_coeff[0]+ (alphas_coeff[1:][:, None] * sample_x.T).sum(axis =0)
         betas_sample = betas_coeff[0]+ (betas_coeff[1:][:, None] * sample_x.T).sum(axis =0)
@@ -567,9 +622,9 @@ def regressor_visu_model(c_table, alphas_coeff, betas_coeff, reg_name='test'):
         #   plt.plot(alphas_sample, betas_sample, color = 'b', linewidth = 0.5, linestyle = '--', alpha = 0.2)
         u += 1
     u = 0
-    for cap in np.linspace(40.5 ** (1 / p_s), 700.5 ** (1 / p_s), 19):
+    for cap in np.linspace(40.5 ** (1 / p_s), 500.5 ** (1 / p_s), 19):
         cap = 5 * int(cap ** p_s / 5)
-        inputs = np.array([np.linspace(1000.05**(1/p_d),18000.5**(1/p_d),700)**p_d,cap*np.ones(700)]).T
+        inputs = np.array([np.linspace(2000.05**(1/p_d),18000.5**(1/p_d),500)**p_d,cap*np.ones(500)]).T
         sample_x = np.concatenate((inputs, np.log(inputs), 1 / inputs), axis=1)
         alphas_sample = alphas_coeff[0] + alphas_coeff[1:] @ sample_x.T
         betas_sample = betas_coeff[0] + betas_coeff[1:] @ sample_x.T
@@ -579,11 +634,11 @@ def regressor_visu_model(c_table, alphas_coeff, betas_coeff, reg_name='test'):
         #   plt.plot(alphas_sample, betas_sample, color = 'r', linewidth = 0.5, linestyle = '--', alpha = 0.2)
         u += 1
     ann1 = np.array(
-        [50 * np.trunc(np.linspace(1000.05 ** (1 / p_d), 18000.5 ** (1 / p_d), 10) ** p_d / 50), 40 * np.ones(10)]).T
+        [50 * np.trunc(np.linspace(2000.05 ** (1 / p_d), 18000.5 ** (1 / p_d), 10) ** p_d / 50), 40 * np.ones(10)]).T
     ann2 = np.concatenate((ann1, np.log(ann1), 1 / ann1), axis=1)
     alphas_sample = alphas_coeff[0] + alphas_coeff[1:] @ ann2.T
     betas_sample = betas_coeff[0] + betas_coeff[1:] @ ann2.T
-    for i, label in enumerate(np.linspace(1000.05 ** (1 / p_d), 18000.5 ** (1 / p_d), 10) ** p_d):
+    for i, label in enumerate(np.linspace(2000.05 ** (1 / p_d), 18000.5 ** (1 / p_d), 10) ** p_d):
         plt.scatter(alphas_sample[i], betas_sample[i], color="darkblue", zorder=3, s=5, marker='s')
         plt.annotate(
             str(50 * int(label / 50+0.5)),  # Le label à afficher
@@ -593,11 +648,11 @@ def regressor_visu_model(c_table, alphas_coeff, betas_coeff, reg_name='test'):
             fontsize=8,  # Taille de la police
             color="darkblue"  # Couleur des annotations
         )
-    ann3 = np.array([1000*np.ones(10),5*np.trunc(np.linspace(40.5**(1/p_s),700.5**(1/p_s),10)**p_s/5)]).T
+    ann3 = np.array([2000*np.ones(10),5*np.trunc(np.linspace(40.5**(1/p_s),500.5**(1/p_s),10)**p_s/5)]).T
     ann4 = np.concatenate((ann3, np.log(ann3), 1 / ann3), axis=1)
     alphas_sample = alphas_coeff[0] + alphas_coeff[1:] @ ann4.T
     betas_sample = betas_coeff[0] + betas_coeff[1:] @ ann4.T
-    for i, label in enumerate(np.linspace(40.5 ** (1 / p_s), 700.5 ** (1 / p_s), 10) ** p_s):
+    for i, label in enumerate(np.linspace(40.5 ** (1 / p_s), 500.5 ** (1 / p_s), 10) ** p_s):
         plt.scatter(alphas_sample[i], betas_sample[i], color="darkred", zorder=3, s=5, marker='s')
         plt.annotate(
             str(5 * int(label / 5+0.5)),  # Le label à afficher
@@ -628,16 +683,41 @@ def regressor_visu_model(c_table, alphas_coeff, betas_coeff, reg_name='test'):
     n_colors = min(10,-int(np.floor(-n_ac/6)))
     n_col = (n_ac - 1) // 19 + 1
     colors = vis_ref.colors_10[:n_colors]
-    for i in range(min(len(names_ac),59)):
+    for i in range(min(len(names_ac),58)):
         plt.scatter(y1[i], y2[i], s=1.5 * vis_ref.sizes[i // n_colors],
                     color=colors[i % n_colors], marker=vis_ref.marker_type[i // n_colors],
                     label=names_ac[i][:30], edgecolors='black', linewidth=0.5)
-    plt.legend(markerscale=1.3, scatterpoints=1, ncol=n_col, bbox_to_anchor=(1, 1))
+    handles, labels = plt.gca().get_legend_handles_labels()
+    legend1 = plt.legend(handles=handles, labels=labels,
+                         framealpha=1, fontsize=11,
+                         bbox_to_anchor=(1.01, 1.01), ncols=3,
+                         title='Measured assignment parameters',labelspacing=0.2, title_fontsize = 13)
+
+    # Ajoute la première légende à l'axe
+    plt.gca().add_artist(legend1)
+
+    # Crée les proxies pour la légende
+    blue_line = mlines.Line2D([], [], color='darkblue', linestyle=':', linewidth=1.5)
+    blue_square = mlines.Line2D([], [], color='darkblue', marker='s', linestyle='None', markersize=4)
+
+    red_line = mlines.Line2D([], [], color='darkred', linestyle=':', linewidth=1.5)
+    red_circle = mlines.Line2D([], [], color='darkred', marker='o', linestyle='None', markersize=4)
+
+    legend2 = plt.legend(
+        handles=[(red_circle, red_line), (blue_square, blue_line)],
+        labels=['ISO avg seats', 'ISO max range'],
+        handler_map={tuple: HandlerTuple(ndivide=None)},  # affiche les deux côte à côte
+        framealpha=1, fontsize=11,
+        bbox_to_anchor=(1.01, -0.05),
+        ncols=2,
+        title='Assignment parameters predictor',
+        loc='lower left', title_fontsize = 13
+    )
     plt.gca().xaxis.set_major_formatter(ScalarFormatter(useMathText=True))
     plt.gca().xaxis.get_major_formatter().set_scientific(True)
     plt.gca().xaxis.get_major_formatter().set_powerlimits((-1, 1))
-    plt.xlabel('Impact of distance', fontsize=14)
-    plt.ylabel('Impact of log(capacity)', fontsize=14)
+    plt.xlabel(r'$\beta_1$ : Impact of distance on logistic score', fontsize=14)
+    plt.ylabel(r'$\beta_2$ : Impact of log(capacity) on logistic score', fontsize=14)
     plt.savefig('figures//estimators_figures//visu_regressor_' + reg_name + '.pdf', bbox_inches="tight", format='pdf')
     plt.show()
 

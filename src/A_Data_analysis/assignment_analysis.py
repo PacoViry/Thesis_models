@@ -7,6 +7,7 @@ import os
 from PIL import Image
 import glob
 from matplotlib.ticker import FuncFormatter
+
 import imageio.v2 as imageio
 # import importlib
 from src.Common_tools import vis_ref
@@ -295,6 +296,258 @@ def market_vis(df, name_fig ='test_market', title_fig = None,  color_mix = vis_r
         plt.savefig('figures/assignment_figures/'+name_fig+'.'+ format_fig, format = format_fig)
     plt.close()
     return None
+
+def market_ranges_marginal(df, name_fig='test_market', title_fig=None, color_mix=vis_ref.colors_26, rank=None, color_rank=None,
+                           market='Aircraft Type', observation='ASK', dist_limits=(4e2, 1.9e4), n_market=24,
+                           reso=400, smooth_param=0.05, weight=False, format_fig='pdf', label_size_param=1):
+
+    plt.style.use('default')
+    fig, ax = plt.subplots(figsize=(11, 6))
+
+    if weight:
+        df = df.copy()
+        df[observation] = df[observation] * df['Weight']
+
+    market_types = df[[market, market+' Name', observation]].groupby([market, market+' Name']).sum().sort_values(
+        by=observation, ascending=False).reset_index()
+
+    selec_0 = market_types.iloc[:n_market].copy()
+    n_market = len(selec_0)
+
+    if rank is not None:
+        selec_0 = selec_0.assign(_rank=selec_0[market+' Name'].map(rank)).sort_values('_rank').drop(
+            columns='_rank').reset_index()
+
+    selec = selec_0[market].to_numpy()
+    selec_n = selec_0[market+' Name'].to_numpy()
+
+    if color_rank is None:
+        color_rank = {ac: k for k, ac in enumerate(selec)}
+
+    dimensions = (14, 10)
+    width_main, width_grid = 17, 21
+    smooth_x = np.log(dist_limits[1]-np.log(dist_limits[0])) * smooth_param / (dimensions[0]*width_main/width_grid)
+
+    input_ac_n = np.asarray(df[market])
+    input_ac = np.asarray(df[['Distance_conn (km)', observation]])
+    res_x_e = np.zeros((n_market + 2, reso))
+
+    for i in range(n_market):
+        input_i = input_ac[input_ac_n == selec[i], :]
+        res_x_e[i+1, :] = vis_ref.smooth_ln_1d(input_i[:, 0], input_i[:, 1], dist_limits, reso,
+                                                smooth_param_x=smooth_x)[0]
+
+    input_i = input_ac[~np.isin(input_ac_n, selec), :]
+    res_x_e[n_market+1, :] = vis_ref.smooth_ln_1d(input_i[:, 0], input_i[:, 1], dist_limits, reso,
+                                                   smooth_param_x=smooth_x)[0]
+    res_x_e = res_x_e.cumsum(axis=0)
+
+    x = np.exp(np.linspace(np.log(dist_limits[0]), np.log(dist_limits[1]), reso))
+    fontsize_legend = min(int(65 / n_market**0.7), int(65 / 12**0.7)) * label_size_param
+    exponent = int(np.log10(market_types[observation].iloc[0]))
+    res_x_e = res_x_e/(0.75*res_x_e.max())
+
+    for j in range(n_market):
+        ax.fill_between(x, res_x_e[j], res_x_e[j+1], color=color_mix[color_rank[selec[j]] % 25],
+                        label=str(selec[j]).replace(" ", "")+' '+str(selec_n[j])+': '+
+                        str(int(1000*selec_0[observation].iloc[j]/market_types[observation].sum()+0.5)/10)+'%',
+                        edgecolor='black', linewidth=0.5)
+
+    others_total = market_types[observation].iloc[n_market:].sum()
+    ax.fill_between(x, res_x_e[n_market], res_x_e[n_market+1], color='0.5',
+                    label='Others: '+
+                    str(int(1000*others_total/market_types[observation].sum()+0.5)/10)+'%',
+                    edgecolor='black', linewidth=0.5)
+    ax.plot(x, res_x_e[n_market+1], color='0', linewidth=1.5)
+
+    handles, labels = ax.get_legend_handles_labels()
+
+    if rank is not None:
+        selec_0[market] = selec_0[market].astype(str).str.replace(' ', '', regex=False)
+        rank_map = selec_0.drop_duplicates(market).set_index(market)["index"].to_dict()
+        sorted_pairs = sorted(zip(handles, labels), key=lambda x_i: (
+            999 if x_i[1].startswith("Others") else rank_map.get(x_i[1].split()[0], 998)))
+        handles, labels = zip(*sorted_pairs)
+
+    labels = tuple(l if l.startswith("Others") else l.split(" ", 1)[1] for l in labels)
+    leg = ax.legend(handles, labels, loc='upper left', bbox_to_anchor=(1, 1.05),
+                    ncols=int(n_market/25+1), fontsize=fontsize_legend, framealpha=1,
+                    edgecolor='none', labelspacing=0.6, title = 'Types & Market shares', title_fontsize = 20)
+    leg.set_zorder(5)
+
+    ax.set_xlabel('Route distance (km)', fontsize=17)
+    ax.set_ylabel('Relative '+observation+'\ndistribution (1)', fontsize=17)
+    ax.set_xscale('log')
+    ax.set_xlim(dist_limits)
+    ax.set_ylim(0, res_x_e.max()*1.05)
+    # ax.set_yticks([])
+    ax.xaxis.set_major_locator(mticker.LogLocator(base=10, subs=(1, 2, 5)))
+    ax.xaxis.set_minor_locator(mticker.LogLocator(base=10, subs=(3, 4, 6, 7, 8, 9)))
+    ax.tick_params(axis='x', which='major', labelsize=14, length = 9)
+    ax.tick_params(axis='x', which='minor', labelsize=10, length = 5)
+
+    ax.grid(True, axis='both', which='major', linestyle='--', linewidth=0.5, color='0.3')
+    ax.set_axisbelow(True)
+
+    if title_fig is not None:
+        fig.suptitle(title_fig, fontsize=24, fontweight='bold', y=0.95, x=0.3, ha='left')
+    else:
+        plt.savefig('figures/assignment_figures/'+name_fig+'_range.'+format_fig, bbox_inches="tight", format=format_fig)
+
+    plt.close()
+
+def market_ranges_marginal_cum(df, name_fig='test_market', title_fig=None, color_mix=vis_ref.colors_26, rank=None, color_rank=None,
+                               range_dict=None, market='Aircraft Type', observation='ASK', dist_limits=(4e2, 1.9e4),
+                               n_market=24, reso=400, weight=False, format_fig='pdf', label_size_param=1):
+
+    plt.style.use('default')
+    fig, ax = plt.subplots(figsize=(11, 10))
+
+    if weight:
+        df = df.copy()
+        df[observation] = df[observation] * df['Weight']
+
+    market_types = df[[market, market+' Name', observation]].groupby([market, market+' Name']).sum().sort_values(
+        by=observation, ascending=False).reset_index()
+
+    selec_0 = market_types.iloc[:n_market].copy()
+    selec_1 = market_types.copy()
+
+    n_market = len(selec_0)
+
+    if rank is not None:
+        selec_0 = selec_0.assign(_rank=selec_0[market+' Name'].map(rank)).sort_values('_rank').drop(
+            columns='_rank').reset_index()
+        selec_1 = selec_1.assign(_rank=selec_1[market + ' Name'].map(rank)).sort_values('_rank').drop(
+            columns='_rank').reset_index()
+
+    selec = selec_0[market].to_numpy()
+    selec1 = selec_1[market].to_numpy()
+    selec_n = selec_1[market+' Name'].to_numpy()
+
+    if color_rank is None:
+        color_rank = {ac: k for k, ac in enumerate(selec)}
+
+    x = np.linspace(dist_limits[0], dist_limits[1], reso)
+    total_observation = market_types[observation].sum()
+
+    # Calculate the contribution of each selected aircraft type
+    contributions = {}
+    for i in range(len(range_dict)):
+        input_i = df.loc[df[market] == selec1[i], ['Distance_conn (km)', observation]].to_numpy()
+        distances = np.sort(input_i[:, 0])
+        cumulative = np.searchsorted(distances, x, side='left')
+        survival = len(distances) - cumulative
+
+        contributions[selec1[i]] = survival / len(distances) * (
+            selec_1[observation].iloc[i] / total_observation
+        )
+
+        # Calculate Others
+    input_i = df.loc[~df[market].isin(selec), ['Distance_conn (km)', observation]].to_numpy()
+    distances = np.sort(input_i[:, 0])
+    cumulative = np.searchsorted(distances, x, side='left')
+    survival = len(distances) - cumulative
+
+    others_total = market_types[observation].iloc[n_market:].sum()
+    others_contribution = survival / len(distances) * (others_total / total_observation)
+
+    # Sort aircraft types by maximum range, from longest to shortest
+    if range_dict is not None:
+        plot_order = sorted(selec1, key=lambda ac: range_dict[ac], reverse=True)
+    else:
+        plot_order = list(selec1)
+
+    # Build cumulative distributions according to the plotting order
+    res_x_e = np.zeros((len(plot_order) + 1, reso))
+
+    for i, ac in enumerate(plot_order):
+        res_x_e[i+1, :] = contributions[ac]
+    res_x_e = res_x_e.cumsum(axis=0)
+
+    fontsize_legend = min(int(65 / n_market**0.7), int(65 / 12**0.7)) * label_size_param
+
+    # Plotrange constraint
+    x_lim_vis = -500
+    x_c = [20000]
+    y_c = [0]
+    for j, ac in enumerate(plot_order):
+        i = np.where(selec1 == ac)[0][0]
+        x_c.append(range_dict[ac])
+        x_c.append(range_dict[ac])
+        y_c.append(res_x_e[j][0])
+        y_c.append(res_x_e[j + 1][0])
+        if ac in color_rank.keys():
+            ax.fill_between(
+                [x_lim_vis,range_dict[ac]], res_x_e[j][0], res_x_e[j + 1][0],
+                color=color_mix[color_rank[ac] % 25],
+                edgecolor='grey', linewidth=0.5, alpha = 0.7
+            )
+        else:
+            ax.fill_between(
+                [x_lim_vis,range_dict[ac]], res_x_e[j][0], res_x_e[j + 1][0],
+                color='0.5',
+                edgecolor='black', linewidth=0.5, alpha = 0.7
+            )
+    x_c.append(x_lim_vis)
+    y_c.append(1)
+
+    # Plot selected aircraft types in decreasing range order
+    for j, ac in enumerate(plot_order):
+        i = np.where(selec1 == ac)[0][0]
+        if ac in color_rank.keys():
+            ax.fill_between(
+                x, res_x_e[j], res_x_e[j+1],
+                color=color_mix[color_rank[ac] % 25],
+                label=str(ac).replace(" ", "")+' '+str(selec_n[i])+': '+
+                      str(int(1000*selec_0[observation].iloc[i]/total_observation+0.5)/10)+'%',
+                edgecolor='black', linewidth=0.5
+            )
+        else:
+            ax.fill_between(
+                x, res_x_e[j], res_x_e[j + 1],
+                color='0.5',
+                edgecolor='black', linewidth=0.5
+            )
+
+    ax.fill_between(
+        x, res_x_e[len(plot_order)], res_x_e[len(plot_order)],
+        color='0.5',
+        label='Others: ' + str(int(1000 * others_total / total_observation + 0.5) / 10) + '%',
+        edgecolor='black', linewidth=0.5
+    )
+    ax.plot(x, res_x_e[len(plot_order)], color='lime', linewidth=3, label = 'Requirements')
+    ax.plot(np.array(x_c), np.array(y_c), color='red', linewidth=3, label = 'Constraint')
+    handles, labels = ax.get_legend_handles_labels()
+
+    leg = ax.legend(
+        handles, labels, loc='upper left', bbox_to_anchor=(1, 1.05),
+        ncols=int(n_market/25+1), fontsize=fontsize_legend, framealpha=1,
+        edgecolor='none', labelspacing=0.4, title='Types',
+        title_fontsize=18)
+    leg.set_zorder(5)
+
+    ax.set_xlabel('Route distance (km)', fontsize=17)
+    ax.set_ylabel('Cumulative relative '+observation+'\ndistribution (1)', fontsize=17)
+    ax.set_xlim((x_lim_vis,dist_limits[1]))
+    ax.yaxis.set_major_formatter(mticker.PercentFormatter(1.0))  # 1.0 = multiplier par 100
+    ax.set_ylim(0, 1.02)
+    ax.set_xticks([0,500, 1000, 2000 ,3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000, 12000, 15000, 17000],
+                  ['0','0.5', '1k', '2k', '3k', '4k', '5k', '6k', '7k', '8k', '9k', '10k', '12k', '15k', '17k'])
+    plt.tick_params(axis='y', labelsize=14)  # Change la taille pour les deux axes
+    ax.tick_params(axis='x', which='major', labelsize=14, length=9)
+    ax.tick_params(axis='x', which='minor', labelsize=10, length=5)
+
+    ax.grid(True, axis='both', which='major', linestyle='--', linewidth=0.5, color='0.3')
+    ax.set_axisbelow(True)
+
+    if title_fig is not None:
+        fig.suptitle(title_fig, fontsize=24, fontweight='bold', y=0.95, x=0.3, ha='left')
+    else:
+        plt.savefig('figures/assignment_figures/'+name_fig+'_range_cum.'+format_fig,
+                    bbox_inches="tight", format=format_fig)
+
+    plt.close()
 
 def assign_vis(df, market_seg, name_fig ='test_assign', title_fig = None, market = 'Aircraft Type', observation = 'ASK',
                dist_limits =(4e2, 1.9e4), capac_limits = (9e3, 4e6),reso=400, smooth_param = 0.05, video = False,
