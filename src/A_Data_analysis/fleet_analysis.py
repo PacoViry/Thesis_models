@@ -555,33 +555,42 @@ def constraint_plot(traff_arrays, active_fleet_arrays, ranges_c, title ='test', 
     N_p = traff_arrays.shape[0]
     values_to_sort2 = np.array(ranges_c)
     sorted_indices2 = np.argsort(values_to_sort2)
+    distance_volume = []
+    range_volume = []
+
     for t in range(N_p): #tri par distance puis somme cumulée sur les deux arrays
         values_to_sort = traff_arrays[t, :, 0]
         sorted_indices = np.argsort(values_to_sort)[::-1]
         traff_arrays[t, :, :] = traff_arrays[t, sorted_indices, :]
+
+        distances = traff_arrays[t, :, 0]
+        shares = traff_arrays[t, :, 1]
+        distance_volume.append((distances*shares).sum()/shares.sum())
+        range_volume.append((ranges_c*active_fleet_arrays[t]).sum()/active_fleet_arrays[t].sum())
         traff_arrays[t,:,1] = np.cumsum(traff_arrays[t,:,1], axis=0)
 
         active_fleet_arrays[t, :] = active_fleet_arrays[t, sorted_indices2[::-1]]
         active_fleet_arrays[t, :] = np.cumsum(active_fleet_arrays[t, :], axis=0)
+
+
     years_array = np.linspace(years[0], years[1], N_p)
     norm = mpl.colors.Normalize(vmin=years[0], vmax=years[1])
-    cmap = plt.get_cmap('turbo')  # ou 'Spectral', 'viridis', 'plasma', etc.
+    cmap = plt.get_cmap('Spectral')  # ou 'Spectral', 'viridis', 'plasma', 'turbo', etc.
     fig, ax = plt.subplots(figsize=(8, 5))
     plt.grid(axis='both', color='grey', linestyle='--')
     for t in range(N_p):
         color = cmap(norm(years_array[t]))
         max_value =  traff_arrays[t, -1, 1]
-        ax.step(traff_arrays[t, :, 0], traff_arrays[t, :, 1]/max_value, linestyle ='-',where='pre', color=color, linewidth=0.5)
+        ax.step(traff_arrays[t, :, 0], traff_arrays[t, :, 1]/max_value, linestyle ='--',where='pre', color=color, linewidth=0.8)
         ax.step(np.concatenate([np.array([0]),ranges_c[sorted_indices2],np.array([ranges_c[sorted_indices2][-1]])]),
-                np.concatenate([np.array([1]),active_fleet_arrays[t][::-1]/max_value,np.array([0])]),where='pre', linestyle = '--', color=color, linewidth=0.5)
+                np.concatenate([np.array([1]),active_fleet_arrays[t][::-1]/max_value,np.array([0])]),where='pre', linestyle = '-', color=color, linewidth=0.8)
     ax.set_xlabel('Connection distance /Max. Range (km)', fontsize = 13)
     ax.set_ylabel('Share of the total seats', fontsize = 13)
     ax.plot([0,0],[0,0], label = 'Active fleet capabilities', linestyle = '--', color = 'black', linewidth=1)
     ax.plot([0,0],[0,0], label = 'Traffic distances', linestyle = '-', color = 'black', linewidth=1)
     plt.legend(loc='upper right', framealpha=1, fontsize = 13)
-    plt.xlim(0)
+    plt.xlim(0, 19000)
     plt.ylim(0, 1.05)
-    plt.tight_layout()
     ax.yaxis.set_major_formatter(mtick.PercentFormatter(xmax=1))
     ax.yaxis.set_major_locator(mtick.MultipleLocator(0.2))
     sm = mpl.cm.ScalarMappable(cmap=cmap, norm=norm)
@@ -589,4 +598,19 @@ def constraint_plot(traff_arrays, active_fleet_arrays, ranges_c, title ='test', 
 
     cbar = plt.colorbar(sm, ax=ax)
     cbar.set_label('Year', fontsize = 13)
-    plt.savefig('figures/integrated_observation/scenario/range_constraints/constraint_plot_'+title+'.'+format)
+    plt.savefig('figures/integrated_observation/scenario/range_constraints/constraint_plot_'+title+'.'+format, bbox_inches="tight", format=format)
+    plt.show()
+    plt.figure(figsize=(8, 5))
+    plt.plot(years_array, np.array(distance_volume), label = 'Avg distance per aircraft seat', color = 'green', linewidth=1, linestyle = '--', marker = 'x')
+    plt.plot(years_array, np.array(range_volume), label = 'Avg max range per aircraft seat', color = 'red', linewidth=1, linestyle = '--', marker = 'x')
+    plt.plot(years_array, np.array(range_volume)-np.array(distance_volume), label = 'Avg range margin', color = 'blue', linewidth=2, marker = 'x', ms = 8, mew = 2)
+    plt.ylim(2000)
+    plt.xlim(years[0], years[1])
+    plt.grid(axis='both', color='grey', linestyle='--')
+    plt.xlabel('Year', fontsize = 13)
+    plt.ylabel('Distance (km)', fontsize = 13)
+    plt.legend(loc='best', framealpha=1, fontsize = 11)
+    plt.savefig('figures/integrated_observation/scenario/range_constraints/constraint_plot_'+title+'_dist_margin.'+format, bbox_inches="tight", format=format)
+
+    plt.show()
+    return None

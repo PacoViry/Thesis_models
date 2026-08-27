@@ -401,7 +401,7 @@ def market_ranges_marginal_cum(df, name_fig='test_market', title_fig=None, color
                                n_market=24, reso=400, weight=False, format_fig='pdf', label_size_param=1):
 
     plt.style.use('default')
-    fig, ax = plt.subplots(figsize=(11, 10))
+    fig, ax = plt.subplots(figsize=(11, 8.6))
 
     if weight:
         df = df.copy()
@@ -466,7 +466,7 @@ def market_ranges_marginal_cum(df, name_fig='test_market', title_fig=None, color
     res_x_e = res_x_e.cumsum(axis=0)
 
     fontsize_legend = min(int(65 / n_market**0.7), int(65 / 12**0.7)) * label_size_param
-
+    range_volume = 0
     # Plotrange constraint
     x_lim_vis = -500
     x_c = [20000]
@@ -477,17 +477,18 @@ def market_ranges_marginal_cum(df, name_fig='test_market', title_fig=None, color
         x_c.append(range_dict[ac])
         y_c.append(res_x_e[j][0])
         y_c.append(res_x_e[j + 1][0])
+        range_volume+=(res_x_e[j + 1][0]-res_x_e[j][0])*range_dict[ac]
         if ac in color_rank.keys():
             ax.fill_between(
                 [x_lim_vis,range_dict[ac]], res_x_e[j][0], res_x_e[j + 1][0],
                 color=color_mix[color_rank[ac] % 25],
-                edgecolor='grey', linewidth=0.5, alpha = 0.7
+                edgecolor='grey', linewidth=0.5, alpha = 0.6, #hatch = '.',
             )
         else:
             ax.fill_between(
                 [x_lim_vis,range_dict[ac]], res_x_e[j][0], res_x_e[j + 1][0],
                 color='0.5',
-                edgecolor='black', linewidth=0.5, alpha = 0.7
+                edgecolor='black', linewidth=0.5, alpha = 0.6, # hatch = '.',
             )
     x_c.append(x_lim_vis)
     y_c.append(1)
@@ -499,7 +500,7 @@ def market_ranges_marginal_cum(df, name_fig='test_market', title_fig=None, color
             ax.fill_between(
                 x, res_x_e[j], res_x_e[j+1],
                 color=color_mix[color_rank[ac] % 25],
-                label=str(ac).replace(" ", "")+' '+str(selec_n[i])+': '+
+                label=str(selec_n[i])+': '+
                       str(int(1000*selec_0[observation].iloc[i]/total_observation+0.5)/10)+'%',
                 edgecolor='black', linewidth=0.5
             )
@@ -516,19 +517,28 @@ def market_ranges_marginal_cum(df, name_fig='test_market', title_fig=None, color
         label='Others: ' + str(int(1000 * others_total / total_observation + 0.5) / 10) + '%',
         edgecolor='black', linewidth=0.5
     )
-    ax.plot(x, res_x_e[len(plot_order)], color='lime', linewidth=3, label = 'Requirements')
-    ax.plot(np.array(x_c), np.array(y_c), color='red', linewidth=3, label = 'Constraint')
+    ax.plot(x, res_x_e[len(plot_order)], color='lime', linewidth=3, label = 'Range requirements')
+    shares = res_x_e[len(plot_order)][:-1]-res_x_e[len(plot_order)][1:]
+    distances = (x[1:] + x[:-1])/2
+    distance_volume = (shares*distances).sum()
+    print('Range volume: ', range_volume)
+    print('Distance volume: ', distance_volume)
+    print('delta volume: ' , range_volume-distance_volume)
+    ax.plot(np.array(x_c), np.array(y_c), color='red', linewidth=3, label = 'Range constraint')
     handles, labels = ax.get_legend_handles_labels()
 
     leg = ax.legend(
-        handles, labels, loc='upper left', bbox_to_anchor=(1, 1.05),
+        handles, labels, loc='upper left', bbox_to_anchor=(1, 1.03),
         ncols=int(n_market/25+1), fontsize=fontsize_legend, framealpha=1,
         edgecolor='none', labelspacing=0.4, title='Types',
         title_fontsize=18)
     leg.set_zorder(5)
 
     ax.set_xlabel('Route distance (km)', fontsize=17)
-    ax.set_ylabel('Cumulative relative '+observation+'\ndistribution (1)', fontsize=17)
+    if observation == 'Av_ac_seats':
+        ax.set_ylabel('Cumulative relative aircraft \ncapacity distribution (1)', fontsize=17)
+    else :
+        ax.set_ylabel('Cumulative relative '+observation+'\ndistribution (1)', fontsize=17)
     ax.set_xlim((x_lim_vis,dist_limits[1]))
     ax.yaxis.set_major_formatter(mticker.PercentFormatter(1.0))  # 1.0 = multiplier par 100
     ax.set_ylim(0, 1.02)
