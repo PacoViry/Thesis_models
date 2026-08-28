@@ -430,27 +430,37 @@ def market_ranges_marginal_cum(df, name_fig='test_market', title_fig=None, color
 
     x = np.linspace(dist_limits[0], dist_limits[1], reso)
     total_observation = market_types[observation].sum()
-
+    print('Total observation: ', total_observation)
     # Calculate the contribution of each selected aircraft type
     contributions = {}
-    for i in range(len(range_dict)):
-        input_i = df.loc[df[market] == selec1[i], ['Distance_conn (km)', observation]].to_numpy()
-        distances = np.sort(input_i[:, 0])
-        cumulative = np.searchsorted(distances, x, side='left')
-        survival = len(distances) - cumulative
+    for i in range(selec1.shape[0]): #previously len(range_dict)
+        input_i = df.loc[
+            df[market] == selec1[i],
+            ['Distance_conn (km)', observation]
+        ].to_numpy()
 
-        contributions[selec1[i]] = survival / len(distances) * (
-            selec_1[observation].iloc[i] / total_observation
-        )
+        distances = input_i[:, 0]
+        values = input_i[:, 1]
 
+        # Sort by distance
+        order = np.argsort(distances)
+        distances = distances[order]
+        values = values[order]
+
+        # Cumulative observation below each distance
+        cumulative = np.cumsum(values)
+
+        # Observation above each x
+        idx = np.searchsorted(distances, x, side='right')
+        survival = cumulative[-1] - np.where(idx > 0, cumulative[idx - 1], 0)
+
+        # Contribution relative to total observation
+        contributions[selec1[i]] = survival / total_observation
         # Calculate Others
     input_i = df.loc[~df[market].isin(selec), ['Distance_conn (km)', observation]].to_numpy()
     distances = np.sort(input_i[:, 0])
     cumulative = np.searchsorted(distances, x, side='left')
-    survival = len(distances) - cumulative
-
     others_total = market_types[observation].iloc[n_market:].sum()
-    others_contribution = survival / len(distances) * (others_total / total_observation)
 
     # Sort aircraft types by maximum range, from longest to shortest
     if range_dict is not None:
@@ -517,14 +527,15 @@ def market_ranges_marginal_cum(df, name_fig='test_market', title_fig=None, color
         label='Others: ' + str(int(1000 * others_total / total_observation + 0.5) / 10) + '%',
         edgecolor='black', linewidth=0.5
     )
-    ax.plot(x, res_x_e[len(plot_order)], color='lime', linewidth=3, label = 'Range requirements')
+    ax.plot(x, res_x_e[len(plot_order)], color='lime', linewidth=3, label = 'Network requirements')
     shares = res_x_e[len(plot_order)][:-1]-res_x_e[len(plot_order)][1:]
     distances = (x[1:] + x[:-1])/2
     distance_volume = (shares*distances).sum()
+
     print('Range volume: ', range_volume)
     print('Distance volume: ', distance_volume)
     print('delta volume: ' , range_volume-distance_volume)
-    ax.plot(np.array(x_c), np.array(y_c), color='red', linewidth=3, label = 'Range constraint')
+    ax.plot(np.array(x_c), np.array(y_c), color='firebrick', linewidth=3, label = 'Fleet constraints')
     handles, labels = ax.get_legend_handles_labels()
 
     leg = ax.legend(
@@ -534,16 +545,16 @@ def market_ranges_marginal_cum(df, name_fig='test_market', title_fig=None, color
         title_fontsize=18)
     leg.set_zorder(5)
 
-    ax.set_xlabel('Route distance (km)', fontsize=17)
+    ax.set_xlabel('Connection distance /Max. Range (km)', fontsize=17)
     if observation == 'Av_ac_seats':
-        ax.set_ylabel('Cumulative relative aircraft \ncapacity distribution (1)', fontsize=17)
+        ax.set_ylabel('Cumulative aircraft seat \ncapacity distribution (1)', fontsize=17)
     else :
-        ax.set_ylabel('Cumulative relative '+observation+'\ndistribution (1)', fontsize=17)
+        ax.set_ylabel('Cumulative aircraft '+observation+'\ndistribution (1)', fontsize=17)
     ax.set_xlim((x_lim_vis,dist_limits[1]))
     ax.yaxis.set_major_formatter(mticker.PercentFormatter(1.0))  # 1.0 = multiplier par 100
     ax.set_ylim(0, 1.02)
-    ax.set_xticks([0,500, 1000, 2000 ,3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000, 12000, 15000, 17000],
-                  ['0','0.5', '1k', '2k', '3k', '4k', '5k', '6k', '7k', '8k', '9k', '10k', '12k', '15k', '17k'])
+    ax.set_xticks([0, 1000, 2000 ,3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000, 12000, 14000, 16000, 18000],
+                  ['0', '1k', '2k', '3k', '4k', '5k', '6k', '7k', '8k', '9k', '10k', '12k', '14k', '16k', '18k'])
     plt.tick_params(axis='y', labelsize=14)  # Change la taille pour les deux axes
     ax.tick_params(axis='x', which='major', labelsize=14, length=9)
     ax.tick_params(axis='x', which='minor', labelsize=10, length=5)
@@ -557,7 +568,7 @@ def market_ranges_marginal_cum(df, name_fig='test_market', title_fig=None, color
         plt.savefig('figures/assignment_figures/'+name_fig+'_range_cum.'+format_fig,
                     bbox_inches="tight", format=format_fig)
 
-    plt.close()
+    plt.show()
 
 def assign_vis(df, market_seg, name_fig ='test_assign', title_fig = None, market = 'Aircraft Type', observation = 'ASK',
                dist_limits =(4e2, 1.9e4), capac_limits = (9e3, 4e6),reso=400, smooth_param = 0.05, video = False,

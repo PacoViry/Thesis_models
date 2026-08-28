@@ -92,7 +92,7 @@ def data_formatting(df, seuils_f = 0.01, n_ac = 60, obs = 'ASK', weight = True, 
     )
     binary_table = (contingency_table > 0).astype(int)
     aircraft_existence_cache = np.array(binary_table)
-    return df_f2[add+['Period', 'Distance_conn (km)', 'Seats_conn_p', obs+'_conn_p', 'Id_mod', obs + '_w']], corr_table, aircraft_existence_cache, max_dist, conn, unique_ids
+    return df_f2[add+['Period', 'Distance_conn (km)', 'Seats_conn_p', obs+'_conn_p', 'Id_mod', obs + '_w', 'Aircraft Operator Name']], corr_table, aircraft_existence_cache, max_dist, conn, unique_ids
 
 def log_likelihood_1_0(data_batch, cache, alphas, betas, omegas, ranges):
     us = (alphas[:, None] * data_batch[:, 1] + betas[:, None] * data_batch[:, 2]) + omegas[

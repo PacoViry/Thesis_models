@@ -551,7 +551,13 @@ def visu_retirements_array(vol_obs, obs_names, period_duration, n_market,graph_n
     plt.show()
     return None
 
-def constraint_plot(traff_arrays, active_fleet_arrays, ranges_c, title ='test', years = [2024,2050], format = 'pdf'):
+def constraint_plot(traff_array, active_fleet_array, ranges_c, title ='test', years = [2024,2050], format = 'pdf', obs_choice= 'ASK'):
+    if obs_choice=='ASK':
+        label = 'ASK'
+    else: label = 'aircraft seat'
+
+    traff_arrays = traff_array.copy()
+    active_fleet_arrays = active_fleet_array.copy()
     N_p = traff_arrays.shape[0]
     values_to_sort2 = np.array(ranges_c)
     sorted_indices2 = np.argsort(values_to_sort2)
@@ -584,10 +590,12 @@ def constraint_plot(traff_arrays, active_fleet_arrays, ranges_c, title ='test', 
         ax.step(traff_arrays[t, :, 0], traff_arrays[t, :, 1]/max_value, linestyle ='--',where='pre', color=color, linewidth=0.8)
         ax.step(np.concatenate([np.array([0]),ranges_c[sorted_indices2],np.array([ranges_c[sorted_indices2][-1]])]),
                 np.concatenate([np.array([1]),active_fleet_arrays[t][::-1]/max_value,np.array([0])]),where='pre', linestyle = '-', color=color, linewidth=0.8)
+    ax.set_xticks([0, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000, 12000, 14000, 16000, 18000],
+                  ['0', '1k', '2k', '3k', '4k', '5k', '6k', '7k', '8k', '9k', '10k', '12k', '14k', '16k', '18k'])
     ax.set_xlabel('Connection distance /Max. Range (km)', fontsize = 13)
-    ax.set_ylabel('Share of the total seats', fontsize = 13)
-    ax.plot([0,0],[0,0], label = 'Active fleet capabilities', linestyle = '--', color = 'black', linewidth=1)
-    ax.plot([0,0],[0,0], label = 'Traffic distances', linestyle = '-', color = 'black', linewidth=1)
+    ax.set_ylabel('Share of the total '+label+'s', fontsize = 13)
+    ax.plot([0,0],[0,0], label = 'Fleet constraints', linestyle = '-', color = 'black', linewidth=1)
+    ax.plot([0,0],[0,0], label = 'Network requirements', linestyle = '--', color = 'black', linewidth=1)
     plt.legend(loc='upper right', framealpha=1, fontsize = 13)
     plt.xlim(0, 19000)
     plt.ylim(0, 1.05)
@@ -598,19 +606,27 @@ def constraint_plot(traff_arrays, active_fleet_arrays, ranges_c, title ='test', 
 
     cbar = plt.colorbar(sm, ax=ax)
     cbar.set_label('Year', fontsize = 13)
-    plt.savefig('figures/integrated_observation/scenario/range_constraints/constraint_plot_'+title+'.'+format, bbox_inches="tight", format=format)
+    plt.savefig('figures/integrated_observation/scenario/range_constraints/constraint_plot_'+title+obs_choice+'.'+format, bbox_inches="tight", format=format)
     plt.show()
     plt.figure(figsize=(8, 5))
-    plt.plot(years_array, np.array(distance_volume), label = 'Avg distance per aircraft seat', color = 'green', linewidth=1, linestyle = '--', marker = 'x')
-    plt.plot(years_array, np.array(range_volume), label = 'Avg max range per aircraft seat', color = 'red', linewidth=1, linestyle = '--', marker = 'x')
-    plt.plot(years_array, np.array(range_volume)-np.array(distance_volume), label = 'Avg range margin', color = 'blue', linewidth=2, marker = 'x', ms = 8, mew = 2)
-    plt.ylim(2000)
+
+    plt.plot(years_array, np.array(distance_volume), label = 'Distance per '+label, color = 'green', linestyle = '--',
+             marker = 'x', linewidth=1.5,ms = 6, mew = 1.5)
+    plt.plot(years_array, np.array(range_volume), label = 'Max range per '+label, color = 'firebrick', linestyle = '--',
+             marker = 'x', linewidth=1.5,ms = 6, mew = 1.5)
+    plt.plot(years_array, np.array(range_volume)-np.array(distance_volume), label = r'Difference $\rightarrow$ Range margin', color = 'blue',
+             linewidth=2, marker = 'x', ms = 8, mew = 2)
+
+    y_min= int(min(min(np.array(distance_volume)),min(np.array(range_volume)),min(np.array(range_volume)-np.array(distance_volume)))/1000)*1000
+    y_max = (int(max(max(np.array(distance_volume)), max(np.array(range_volume)),
+                    max(np.array(range_volume) - np.array(distance_volume))) / 1000)+1) * 1000
+    plt.ylim((y_min, y_max))
     plt.xlim(years[0], years[1])
     plt.grid(axis='both', color='grey', linestyle='--')
     plt.xlabel('Year', fontsize = 13)
     plt.ylabel('Distance (km)', fontsize = 13)
-    plt.legend(loc='best', framealpha=1, fontsize = 11)
-    plt.savefig('figures/integrated_observation/scenario/range_constraints/constraint_plot_'+title+'_dist_margin.'+format, bbox_inches="tight", format=format)
+    plt.legend(loc='best', framealpha=1, fontsize = 11, title = 'Average indicators:', title_fontsize = 13)
+    plt.savefig('figures/integrated_observation/scenario/range_constraints/constraint_plot_'+title+obs_choice+'_dist_margin.'+format, bbox_inches="tight", format=format)
 
     plt.show()
     return None
