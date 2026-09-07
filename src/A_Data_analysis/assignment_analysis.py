@@ -213,11 +213,11 @@ def market_vis(df, name_fig ='test_market', title_fig = None,  color_mix = vis_r
     exponent = int(np.log10(market_types[observation][0]))
     for j in range(len(moys)): #posera peut être un jour problème pour bien garder un ordre correct, ne pas trier et reordonner? (regarder l'ancien code)
         x_density_ax.fill_between(X,res_x_e[j], res_x_e[j+1],color = color_mix[color_rank[selec[j]]%25],
-                    label = str(selec[j]).replace(" ", "")+' ' + str(selec_n[j])+': '+str(int(10**-(exponent-2)*(selec_0[observation][j])+0.5)/100)+'e'+str(exponent)+ ', ' #' '+ observation +
+                    label = str(selec[j]).replace(" ", "")+' ' + str(selec_n[j])+': '#+str(int(10**-(exponent-2)*(selec_0[observation][j])+0.5)/100)+'e'+str(exponent)+ ', ' #' '+ observation +
                      + str(int(1000*(selec_0[observation][j])/market_types[observation].sum()+0.5)/10)+'%',edgecolor='black', linewidth=0.5)
     x_density_ax.fill_between(X, res_x_e[len(moys)], res_x_e[len(moys) + 1], color='0.5',
-                              label= 'Others: ' + str(int(10 ** -(exponent-2) * (
-                              market_types[observation][len(moys):].sum()) + 0.5) / 100) + 'e'+str(exponent)+  ', '#' ' + observation +
+                              label= 'Others: ' #+ str(int(10 ** -(exponent-2) * (
+                              #market_types[observation][len(moys):].sum()) + 0.5) / 100) + 'e'+str(exponent)+  ', '#' ' + observation +
                                     + str(int(1000 * (market_types[observation][len(moys):].sum()) / market_types[observation].sum() + 0.5) / 10) + '%', edgecolor='black', linewidth=0.5)
     x_density_ax.plot(X, res_x_e[len(moys) + 1], color='0', linewidth=1.5)
 
@@ -1239,25 +1239,29 @@ def inflation_evolution(traff_1, observation= 'ASK'):
         years,
         seats_variation,
         linestyle='-',
-        color='black',
-        label='Aircraft size evolution'
+        color='#07004D',
+        label='AC size evolution',
+        linewidth =2
     )
 
     ax.plot(
         years,
         time_t_inflation,
         linestyle='--',
-        color='blue',
-        label='Size inflation index',
-        zorder=2
+        color='#289B7D',
+        label='Annual corr. size index',
+        zorder=2,
+        linewidth =2
     )
 
     ax.plot(
         years,
         cum_inflation,
         linestyle='-',
-        color='blue',
-        label='Cum. inflation index'
+        color='#289B7D',
+        label='Cum. corr. size index',
+        zorder=2,
+        linewidth =2
     )
 
     # --- Filled areas first ---
@@ -1265,18 +1269,19 @@ def inflation_evolution(traff_1, observation= 'ASK'):
         years,
         seats_variation,
         cum_inflation,
-        alpha=0.2,
-        label='Traffic contribution'
+        alpha=0.4,
+        label='Est. network contr.',
+        color = '#2D82B7'
     )
 
     ax.axvspan(
         2020,
         2024,
-        color='orange',
+        color='#EB8A90',
         alpha=1,
-        zorder=2
+        zorder=3
     )
-    ax.text(2020, 0.15, 'COVID', color='white', fontsize=13)
+    ax.text(2020, 0.07, 'COVID', color='white', fontsize=13)
 
     # --- Secondary y-axis ---
     def relative_to_seats(x):
@@ -1290,18 +1295,18 @@ def inflation_evolution(traff_1, observation= 'ASK'):
         functions=(relative_to_seats, seats_to_relative)
     )
 
-    secax.set_ylabel(observation+'-weighted avg aircraft seats', fontsize=13)
+    secax.set_ylabel(observation+'-weighted avg AC seats', fontsize=13)
 
     # --- Formatting ---
     ax.yaxis.set_major_formatter(mticker.PercentFormatter(xmax=1.0))
 
     ax.axhline(0, color='black', linewidth=0.8)
 
-    ax.set_ylim(-0.15, 0.2)
+    ax.set_ylim(-0.11, 0.18)
     ax.set_xlim(1990, 2025)
     ax.grid()
 
     ax.set_ylabel('Relative variations', fontsize=13)
-    ax.legend(framealpha=1, loc='lower left', ncol=2, fontsize=12)
+    ax.legend(framealpha=1, loc='lower left', ncol=2, fontsize=11)
     plt.savefig('figures/assignment_figures/'+observation+'_weighted_size_indicators.pdf',bbox_inches="tight")
     plt.show()

@@ -616,6 +616,14 @@ def constraint_plot(traff_array, active_fleet_array, ranges_c, title ='test', ye
              marker = 'x', linewidth=1.5,ms = 6, mew = 1.5)
     plt.plot(years_array, np.array(range_volume)-np.array(distance_volume), label = r'Difference $\rightarrow$ Range margin', color = 'blue',
              linewidth=2, marker = 'x', ms = 8, mew = 2)
+    plt.axvspan(
+        2020-0.5,
+        2024-0.5,
+        color='#EB8A90',
+        alpha=0.85,
+        zorder=3
+    )
+    plt.text(2019.5, 6500, 'COVID', color='white', fontsize=15)
 
     y_min= int(min(min(np.array(distance_volume)),min(np.array(range_volume)),min(np.array(range_volume)-np.array(distance_volume)))/1000)*1000
     y_max = (int(max(max(np.array(distance_volume)), max(np.array(range_volume)),
@@ -625,7 +633,7 @@ def constraint_plot(traff_array, active_fleet_array, ranges_c, title ='test', ye
     plt.grid(axis='both', color='grey', linestyle='--')
     plt.xlabel('Year', fontsize = 13)
     plt.ylabel('Distance (km)', fontsize = 13)
-    plt.legend(loc='best', framealpha=1, fontsize = 11, title = 'Average indicators:', title_fontsize = 13)
+    plt.legend(loc='upper left', framealpha=1, fontsize = 11, title = 'Average indicators:', title_fontsize = 13, bbox_to_anchor=(0, 0.65))
     plt.savefig('figures/integrated_observation/scenario/range_constraints/constraint_plot_'+title+obs_choice+'_dist_margin.'+format, bbox_inches="tight", format=format)
 
     plt.show()
