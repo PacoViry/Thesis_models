@@ -25,7 +25,7 @@ importlib.reload(vis_ref)
 #3) To connect aircraft caracteristics and assignment coefficients.
 
 
-def data_formatting(df, seuils_f = 0.01, n_ac = 60, obs = 'ASK', weight = True, save_techn_carac = False, airports = False):
+def data_formatting(df, seuils_f = 0.01, n_ac = 60, obs = 'ASK', weight = True, save_techn_carac = False, airports = False, aircraft_operator= False):
     if airports :
         add = ['ADES', 'ADEP']
     else :
@@ -92,7 +92,12 @@ def data_formatting(df, seuils_f = 0.01, n_ac = 60, obs = 'ASK', weight = True, 
     )
     binary_table = (contingency_table > 0).astype(int)
     aircraft_existence_cache = np.array(binary_table)
-    return df_f2[add+['Period', 'Distance_conn (km)', 'Seats_conn_p', obs+'_conn_p', 'Id_mod', obs + '_w', 'Aircraft Operator Name']], corr_table, aircraft_existence_cache, max_dist, conn, unique_ids
+    if aircraft_operator:
+        return df_f2[add+['Period', 'Distance_conn (km)', 'Seats_conn_p', obs+'_conn_p', 'Id_mod', obs + '_w', 'Aircraft Operator Name']], corr_table, aircraft_existence_cache, max_dist, conn, unique_ids
+    else:
+        return df_f2[add+['Period', 'Distance_conn (km)', 'Seats_conn_p', obs+'_conn_p', 'Id_mod', obs + '_w']], corr_table, aircraft_existence_cache, max_dist, conn, unique_ids
+
+
 
 def log_likelihood_1_0(data_batch, cache, alphas, betas, omegas, ranges):
     us = (alphas[:, None] * data_batch[:, 1] + betas[:, None] * data_batch[:, 2]) + omegas[
@@ -491,7 +496,7 @@ def visu_coeffs(alphas, betas, names_ac,ds_name, d_norm = 1, cap_norm = 1):
     #                      title='Measured assignment parameters')
 
     plt.legend(framealpha=1, fontsize=11, bbox_to_anchor=(1.01, 1.02), ncols=3,
-               title='Measured assignment parameters',labelspacing=0.1, title_fontsize = 13)
+               title='Measured assignment parameters',labelspacing=0.4, title_fontsize = 14)
     plt.gca().xaxis.set_major_formatter(ScalarFormatter(useMathText=True))
     plt.gca().xaxis.get_major_formatter().set_scientific(True)
     plt.gca().xaxis.get_major_formatter().set_powerlimits((-1, 1))
@@ -505,7 +510,6 @@ def visu_seat_ranges(ranges, seats, names_ac, ds_name, d_norm=1, cap_norm=1):
     plt.grid(True, linestyle='--', linewidth=0.3, color='gray')
     n_ac = len(names_ac)
     n_colors = min(10, -int(np.floor(-n_ac / 6)))
-    n_col = (n_ac - 1) // 19 + 1
     colors = vis_ref.colors_10[:n_colors]
     df_visu = pd.DataFrame({'alphas': ranges, 'betas': seats}, index=names_ac).sort_index()
     alphas = np.array(df_visu['alphas'])
@@ -516,13 +520,13 @@ def visu_seat_ranges(ranges, seats, names_ac, ds_name, d_norm=1, cap_norm=1):
                     color=colors[i % n_colors], marker=vis_ref.marker_type[i // n_colors],
                     label=names_ac[i][:30], edgecolors='black', linewidth=0.5)
 
-    # plt.legend(framealpha=1, fontsize=11, bbox_to_anchor=(1.01, 1.02), ncols=3,
-    #            title='Aircraft type', labelspacing=0.1, title_fontsize=13)
+    plt.legend(framealpha=1, fontsize=11, bbox_to_anchor=(-0.1, 1.3), ncols=10,
+               labelspacing=0.1, title_fontsize=13, loc = "upper left",columnspacing=0.2)
     plt.xlabel(r'Estimated maximum range (km)', fontsize=14)
     plt.ylabel(r'Average seat capacity', fontsize=14)
     plt.xlim((0,18000))
     plt.ylim((0,500))
-    plt.savefig('figures//estimators_figures//range_seats_' + ds_name + '.pdf', format='pdf')
+    plt.savefig('figures//estimators_figures//range_seats_' + ds_name + '.pdf', bbox_inches="tight", format='pdf')
     plt.show()
 
 def regressor_assign_coeffs(c_table, weight = False, weight_log = False, obs_choice = 'ASK', visu = True):

@@ -222,7 +222,7 @@ def TATs_matrix(df, name_fig = 'test', x_min = 0.5,x_max = 14, y_min = 0.5, y_ma
 
     x = np.array(df_2['Planned Flight Duration -1']) * (1 - sigma_x ** 2 / 2)
     y = np.array(df_2['Planned Flight Duration +1']) * (1 - sigma_y ** 2 / 2)
-    z = (np.array(df_2['Ground Time -1']))
+    z = (np.array(df_2['Ground Time']))
     mask_z = (z<z_max)&(df_2['Planned Flight Duration -1']>0)
     x, y, z = x[mask_z], y[mask_z], z[mask_z]
 
