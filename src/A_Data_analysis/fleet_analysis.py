@@ -633,7 +633,7 @@ def constraint_plot(traff_array, active_fleet_array, ranges_c, title ='test', ye
     plt.grid(axis='both', color='grey', linestyle='--')
     plt.xlabel('Year', fontsize = 13)
     plt.ylabel('Distance (km)', fontsize = 13)
-    plt.legend(loc='upper left', framealpha=1, fontsize = 11, title = 'Average indicators:', title_fontsize = 13, bbox_to_anchor=(0, 0.65))
+    plt.legend(loc='best', framealpha=0.8, fontsize = 11, title = 'Average indicators:', title_fontsize = 13)
     plt.savefig('figures/integrated_observation/scenario/range_constraints/constraint_plot_'+title+obs_choice+'_dist_margin.'+format, bbox_inches="tight", format=format)
 
     plt.show()
