@@ -638,3 +638,127 @@ def constraint_plot(traff_array, active_fleet_array, ranges_c, title ='test', ye
 
     plt.show()
     return None
+
+
+def historic_retirement_age(fleet_db, y_min=2000, y_max=2024):
+    df = fleet_db.copy()
+    # Convert relevant columns to numeric years
+    df["delivery_year"] = pd.to_numeric(
+        df["Delivery Date"], errors="coerce"
+    )
+    df["event_year"] = pd.to_numeric(
+        df["Event Date"], errors="coerce"
+    )
+
+    # Remove aircraft without a valid delivery year
+    df = df.dropna(subset=["delivery_year"])
+
+    years = range(y_min, y_max + 1)
+    categories = sorted(df["Aircraft cat"].dropna().unique())
+
+    results = []
+
+    for category in categories:
+
+        cat_df = df[df["Aircraft cat"] == category]
+
+        for year in years:
+
+            # Aircraft delivered by the considered year
+            delivered = cat_df[
+                cat_df["delivery_year"] <= year
+            ]
+
+            # Aircraft retired before or during the considered year
+            retired = delivered[
+                (delivered["Status"] == "Written Off")
+                & (delivered["event_year"] <= year)
+            ]
+
+            # Aircraft present in the fleet during the considered year
+            fleet = delivered[
+                ~delivered.index.isin(retired.index)
+            ]
+
+            # Mean fleet age
+            fleet_ages = year - fleet["delivery_year"]
+            mean_fleet_age = fleet_ages.mean()
+
+            # Retirements occurring during the considered year
+            retirements_year = cat_df[
+                (cat_df["Status"] == "Written Off")
+                & (cat_df["event_year"] <= year)
+                & (cat_df["event_year"] > year-1)
+            ]
+
+            # Mean retirement age
+            retirement_ages = (
+                retirements_year["event_year"]
+                - retirements_year["delivery_year"]
+            )
+
+            mean_retirement_age = retirement_ages.mean()
+
+            results.append({
+                "Aircraft cat": category,
+                "Year": year,
+                "mean_fleet_age": mean_fleet_age,
+                "mean_retirement_age": mean_retirement_age,
+                "fleet_count": len(fleet),
+                "retirement_count": len(retirements_year),
+            })
+
+    retirement_age_df = pd.DataFrame(results)
+    categories = sorted(retirement_age_df["Aircraft cat"].unique())
+    categories = ['TP', 'RJ', 'NB', 'WB']
+    fig, ax = plt.subplots(figsize=(8, 5.5))
+
+    # Assign one color to each aircraft category
+    colors = colors_5
+
+    for i, category in enumerate(categories):
+        data = retirement_age_df[
+            retirement_age_df["Aircraft cat"] == category
+            ]
+
+        color = colors[i % len(colors)]
+
+        # Mean fleet age: continuous line
+        ax.plot(
+            data["Year"],
+            data["mean_fleet_age"],
+            color=color,
+            linestyle=":",
+            label=f"{category}: Fleet age"
+        )
+
+        # Mean retirement age: dotted line
+        ax.plot(
+            data["Year"],
+            data["mean_retirement_age"],
+            color=color,
+            linestyle="-",
+            label=f"{category}: Retirement age"
+        )
+
+    ax.set_xlabel("Year", fontsize=13)
+    ax.set_ylabel("Age (years)", fontsize=13)
+    ax.tick_params(axis='both', which='major', labelsize=12)
+    ax.set_ylim(bottom=0)
+    ax.set_xlim((y_min, y_max))
+
+    ax.axvspan(
+        2020 - 0.5,
+        2024 - 0.5,
+        color='#EB8A90',
+        alpha=0.85,
+        zorder=3
+    )
+    ax.text(2020, 17.5, 'COVID', color='white', fontsize=14)
+
+    ax.grid(True, alpha=0.3)
+    ax.legend(ncol =2, framealpha = 1, fontsize = 12)
+    plt.tight_layout()
+    plt.savefig('figures/integrated_observation/scenario/historic_retirement_age.pdf')
+    plt.show()
+    return None
