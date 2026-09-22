@@ -17,7 +17,7 @@ import jetfuelburn as jfb #si on souhaite utiliser les modèles pour la consomma
 #     'Real Flight Duration +1', 'Planned Flight Duration -1',
 #     'Real Flight Duration -1'
 
-def activity_assignment(df, excel_title, corrective_factor = 1.0, d_seuil=6000, v_1=830, v_2=900,v_c = 500, supp=0.5, act =  True):
+def activity_assignment(df, excel_title, corrective_factor = 1.0, d_seuil=6000, v_1=860, v_2=910,v_c = 350, supp=0.5, act =  True):
     stat_est = pd.read_excel('data/productivity_measures/GT_contr_estimates_'+excel_title+'.xlsx')
     stat_est['abscisse'] = np.log(stat_est['abscisse'])
 
@@ -36,8 +36,8 @@ def activity_assignment(df, excel_title, corrective_factor = 1.0, d_seuil=6000, 
                           + supp*(1-np.exp(-df['Distance_conn (km)']*corrective_factor/(v_c*v_1)*(v_1-v_c)/supp))) #terme à la schlague pour intégrer une grimpe progressive et les 2 asymptotes
     gt_cont = linear_interp(np.log(df['Estimated FT'].values+0.3)) #+0.3 correspond aux effets du taxi in/out
     if act :
-        df['Activity'] = df['N_flights']*(df['Estimated FT']+gt_cont)/(24*365.25)
-    df['Av_ac_seats']= df['Seats']*(df['Estimated FT']+gt_cont)/(24*365.25)
+        df['Activity'] = df['N_flights']*(df['Estimated FT']+gt_cont+0.3)/(24*365.25)
+    df['Av_ac_seats']= df['Seats']*(df['Estimated FT']+gt_cont+0.3)/(24*365.25)
 
     x_l = np.linspace(np.log(0.1), np.log(15), 500)
     y = linear_interp(x_l)
