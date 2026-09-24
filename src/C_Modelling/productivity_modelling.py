@@ -17,7 +17,7 @@ import jetfuelburn as jfb #si on souhaite utiliser les modèles pour la consomma
 #     'Real Flight Duration +1', 'Planned Flight Duration -1',
 #     'Real Flight Duration -1'
 
-def activity_assignment(df, excel_title, corrective_factor = 1.0, d_seuil=6000, v_1=860, v_2=910,v_c = 350, supp=0.5, act =  True):
+def activity_assignment(df, excel_title, corrective_factor = 1.0, d_seuil=6000, v_1=860, v_2=910,v_c = 350, supp_NB=0.3, supp_WB=0.4, act =  True):
     stat_est = pd.read_excel('data/productivity_measures/GT_contr_estimates_'+excel_title+'.xlsx')
     stat_est['abscisse'] = np.log(stat_est['abscisse'])
 
@@ -31,10 +31,11 @@ def activity_assignment(df, excel_title, corrective_factor = 1.0, d_seuil=6000, 
         bounds_error=False,
         fill_value=(TAT_appro_lin[0], TAT_appro_lin[-1])
     )
-    df['Estimated FT'] = (((df['Distance_conn (km)']<d_seuil*corrective_factor)*corrective_factor*df['Distance_conn (km)']/v_1 +
-                          (df['Distance_conn (km)'] >= d_seuil*corrective_factor) * corrective_factor *df['Distance_conn (km)'] / v_2)
-                          + supp*(1-np.exp(-df['Distance_conn (km)']*corrective_factor/(v_c*v_1)*(v_1-v_c)/supp))) #terme à la schlague pour intégrer une grimpe progressive et les 2 asymptotes
-    gt_cont = linear_interp(np.log(df['Estimated FT'].values+0.3)) #+0.3 correspond aux effets du taxi in/out
+    df['Estimated FT'] = (((df['Distance_conn (km)']<d_seuil*corrective_factor)*(corrective_factor*df['Distance_conn (km)']/v_1 +supp_NB*(1-np.exp(-df['Distance_conn (km)']*corrective_factor/(v_c*v_1)*(v_1-v_c)/supp_NB))))
+                          +(df['Distance_conn (km)'] >= d_seuil*corrective_factor) * (corrective_factor *df['Distance_conn (km)'] / v_2+supp_WB))
+                            #terme à la schlague pour intégrer une grimpe progressive et les 2 asymptotes
+    vals = np.log(df['Estimated FT'].values + 0.3).flatten()
+    gt_cont = linear_interp(vals)
     if act :
         df['Activity'] = df['N_flights']*(df['Estimated FT']+gt_cont+0.3)/(24*365.25)
     df['Av_ac_seats']= df['Seats']*(df['Estimated FT']+gt_cont+0.3)/(24*365.25)
@@ -73,7 +74,8 @@ def ASK_assignment(df, excel_title, corrective_factor = 1.0, d_seuil=5000, v_1=8
                                'Distance_conn (km)'] / v_2)
                           + supp * (1 - np.exp(-df['Distance_conn (km)'] * corrective_factor / v_c * (
                         v_1 - v_c) / supp)))  # terme à la schlague pour intégrer une grimpe progressive et les 2 asymptotes
-    gt_cont = linear_interp(np.log(df['Estimated FT'].values + 0.3))  # +0.3 correspond aux effets du taxi in/out
+    vals = np.log(df['Estimated FT'].values + 0.3).flatten()
+    gt_cont = linear_interp(vals)
     df['Seats'] = df['Av_ac_seats']/ ((df['Estimated FT'] + gt_cont) / (24 * 365.25))
     df['ASK'] = df['Seats']*df['Distance_conn (km)']
     return None

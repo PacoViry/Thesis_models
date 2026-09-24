@@ -246,8 +246,10 @@ def market_vis(df, name_fig ='test_market', title_fig = None,  color_mix = vis_r
         leg = x_density_ax.legend(handles, labels, loc='upper left', bbox_to_anchor=(0.97,1.05), ncols=int(n_market/25+1),
                                   fontsize=fontsize_legend, framealpha=1, edgecolor='none',labelspacing=0.4)
     leg.set_zorder(5)
-
-    x_density_ax.set_ylabel(observation +'\n'+'distribution (1)', fontsize=14)
+    if observation == 'Av_ac_seats':
+        x_density_ax.set_ylabel('Aircraft activity' + '\n' + 'distribution (1)', fontsize=14)
+    else:
+        x_density_ax.set_ylabel(observation +'\n'+'distribution (1)', fontsize=14)
     x_density_ax.set_xscale('log')
     x_density_ax.set_ylim(0, m_x_ref)
     x_density_ax.set_xlim(dist_limits[0], dist_limits[1])
@@ -279,7 +281,10 @@ def market_vis(df, name_fig ='test_market', title_fig = None,  color_mix = vis_r
 
     cbar = plt.colorbar(pcm, cax=cax)
     cbar.ax.tick_params(labelsize=12)
-    cbar.set_label(observation+' density (normalized)', fontsize=14)
+    if observation == 'Av_ac_seats':
+        cbar.set_label('Aircraft activity' + ' density (normalized)', fontsize=14)
+    else:
+        cbar.set_label(observation + ' density (normalized)', fontsize=14)
     for b, style, width in zip(boundaries, ['-','-','--','--'], [1.6, 0.9, 0.9, 0.5]):
         cbar.ax.hlines(
             y=b,
