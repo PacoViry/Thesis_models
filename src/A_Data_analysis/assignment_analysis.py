@@ -76,16 +76,16 @@ def agg_ind_s(df, observation = 'ASK'):
         on=['ADEP', 'ADES', 'Period'],
         how='left'
     )
-
     return df
 
-def market_vis(df, name_fig ='test_market', title_fig = None,  color_mix = vis_ref.colors_26, rank = None, color_rank =None,
+def market_vis(df_o, name_fig ='test_market', title_fig = None,  color_mix = vis_ref.colors_26, rank = None, color_rank =None,
                market = 'Aircraft Type', observation = 'ASK', dist_limits =(4e2, 1.9e4), capac_limits = (9e3, 4e6),
                   ask_d_ref = None, m_x_ref = None, m_y_ref = None, video = False, fun_mode = False,
                   n_market = 24, reso = 400, smooth_param = 0.05, period_duration = 1, weight = False, format_fig = 'pdf',
-               label_size_param = 1):
+               label_size_param = 1, synthetic_mode = False):
     #On peut étudier les flux par aéroport, opérateur, avion. Selon les ASKs, sieges ou nombre de vols
     #dimensions du graphe et du lissage
+    df= df_o.copy()
     plt.style.use('default')
     dimensions = (14,10)
     width_grid, height_grid = 21,8
@@ -115,19 +115,29 @@ def market_vis(df, name_fig ='test_market', title_fig = None,  color_mix = vis_r
         selec_0 = selec_0.assign(_rank=selec_0[market+' Name'].map(rank)).sort_values('_rank').drop(columns='_rank').reset_index()
     selec = selec_0[market]
     selec_n = selec_0[market+' Name']
-    if weight:
-        int_traff = df[list({'ADEP', 'ADES', 'Distance_conn (km)', 'Seats_conn_p', observation + '_conn_p',
-                        'Weight'})].drop_duplicates(subset=['ADES', 'ADEP'], keep='first')[
-            list({'Distance_conn (km)', 'Seats_conn_p', observation + '_conn_p', 'Weight'})]
-        traff_matrix, x, y = vis_ref.smooth_ln_2d(np.array(int_traff['Distance_conn (km)']),
-                                        np.array(int_traff['Seats_conn_p']) / period_duration,
-                                    np.array(int_traff[observation + '_conn_p']) * np.array(
-                                                int_traff['Weight']), dist_limits,capac_limits, reso, smooth_x, smooth_y)
+    if synthetic_mode:  ## volume per connection does not reflect the cumulated values
+        if weight:
+            traff_matrix, x, y = vis_ref.smooth_ln_2d(np.array(df['Distance_conn (km)']),
+                                            np.array(df['Seats_conn_p']) / period_duration,
+                                        np.array(df[observation]) * np.array(
+                                                    df['Weight']), dist_limits,capac_limits, reso, smooth_x, smooth_y)
+        else:
+            traff_matrix, x, y = vis_ref.smooth_ln_2d(np.array(df['Distance_conn (km)']), np.array(df['Seats_conn_p']) / period_duration,
+            np.array(df[observation]), dist_limits, capac_limits, reso, smooth_x, smooth_y)
     else:
-        int_traff = df[list({'ADEP', 'ADES', 'Distance_conn (km)', 'Seats_conn_p', observation + '_conn_p'})].drop_duplicates(
-        subset = ['ADES', 'ADEP'], keep = 'first')[list({'Distance_conn (km)', 'Seats_conn_p', observation + '_conn_p'})]
-        traff_matrix, x, y = vis_ref.smooth_ln_2d(np.array(int_traff['Distance_conn (km)']), np.array(int_traff['Seats_conn_p']) / period_duration,
-        np.array(int_traff[observation + '_conn_p']), dist_limits, capac_limits, reso, smooth_x, smooth_y)
+        if weight:
+            int_traff = df[list({'ADEP', 'ADES', 'Distance_conn (km)', 'Seats_conn_p', observation + '_conn_p',
+                            'Weight'})].drop_duplicates(subset=['ADES', 'ADEP'], keep='first')[
+                list({'Distance_conn (km)', 'Seats_conn_p', observation + '_conn_p', 'Weight'})]
+            traff_matrix, x, y = vis_ref.smooth_ln_2d(np.array(int_traff['Distance_conn (km)']),
+                                            np.array(int_traff['Seats_conn_p']) / period_duration,
+                                        np.array(int_traff[observation + '_conn_p']) * np.array(
+                                                    int_traff['Weight']), dist_limits,capac_limits, reso, smooth_x, smooth_y)
+        else:
+            int_traff = df[list({'ADEP', 'ADES', 'Distance_conn (km)', 'Seats_conn_p', observation + '_conn_p'})].drop_duplicates(
+            subset = ['ADES', 'ADEP'], keep = 'first')[list({'Distance_conn (km)', 'Seats_conn_p', observation + '_conn_p'})]
+            traff_matrix, x, y = vis_ref.smooth_ln_2d(np.array(int_traff['Distance_conn (km)']), np.array(int_traff['Seats_conn_p']) / period_duration,
+            np.array(int_traff[observation + '_conn_p']), dist_limits, capac_limits, reso, smooth_x, smooth_y)
     traff_matrix = traff_matrix.transpose()
     X = np.exp(x)
     Y = np.exp(y)

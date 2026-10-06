@@ -384,6 +384,7 @@ def visu_deliveries_array(deliveries, obs_sizes, obs_names, period_duration, n_m
 
     # indices des plus gros volumes
     top_idx = np.argsort(-col_sums)[:min(n_market * 2-3,N_m)]
+    exp_leg = int(np.log10(col_sums[top_idx[0]]))-1
     # calcul de la date moyenne d'utilisation
     mean_date = []
 
@@ -419,7 +420,7 @@ def visu_deliveries_array(deliveries, obs_sizes, obs_names, period_duration, n_m
     obs_names = [obs_names[i] for i in ordered_indices]
     n_bars = deliveries.shape[0]
     p_categories = deliveries.shape[1]
-    x = np.arange(n_bars) * period_duration + 2024
+    x = np.arange(n_bars) * period_duration + 2026
     bottom = np.zeros(n_bars)
     top = np.zeros(n_bars)
     fig, ax = plt.subplots(figsize=(10, 5.5))
@@ -427,11 +428,11 @@ def visu_deliveries_array(deliveries, obs_sizes, obs_names, period_duration, n_m
     for i in range(min(p_categories, N_m)):
         top = top + deliveries[:, i]
         if i < n_market:
-            ax.fill_between(x, bottom, top, label=obs_names[i],
+            ax.fill_between(x, bottom, top, label=obs_names[i] +' '+ str(int((deliveries[:, i].sum())/10**(exp_leg-1)+0.5)/10) + 'e'+str(exp_leg)+ ' seats',
                             color=color_mix[i], linewidth=0, alpha=1, zorder=2)
             bottom = top
         elif i < 2 * n_market - 3:
-            ax.fill_between(x, bottom, top, label=obs_names[i],
+            ax.fill_between(x, bottom, top, label=obs_names[i] +' '+ str(int((deliveries[:, i].sum())/10**(exp_leg-1)+0.5)/10) + 'e'+str(exp_leg)+ ' seats',
                             color=color_mix[i - n_market], linewidth=0, edgecolor='0.2', alpha=1, hatch='..', zorder=2)
             bottom = top
     ax.fill_between(x, bottom, top, alpha=0.8, color='grey', linewidth=0, edgecolor='white', label='Others', hatch='//',
@@ -760,5 +761,185 @@ def historic_retirement_age(fleet_db, y_min=2000, y_max=2024):
     ax.legend(ncol =2, framealpha = 1, fontsize = 12)
     plt.tight_layout()
     plt.savefig('figures/integrated_observation/scenario/historic_retirement_age.pdf')
+    plt.show()
+    return None
+
+
+def visu_fleet_array(vol_obs, obs_names, obs_name, color_mix=colors_26):
+    """Stacked-area evolution of a per-type 2D volume array (T, M)."""
+    totals = vol_obs.sum(axis=0)
+    top_k = min(48, vol_obs.shape[1])
+    top_indices = np.argsort(-totals)[:top_k]
+
+    t = np.arange(vol_obs.shape[0])
+    mean_date = {}
+    for m in top_indices:
+        if totals[m] > 0:
+            mean_date[m] = (t * vol_obs[:, m]).sum() / totals[m]
+        else:
+            mean_date[m] = -np.inf
+
+    sorted_top = sorted(top_indices, key=lambda m: -mean_date[m])
+    others = [m for m in range(vol_obs.shape[1]) if m not in sorted_top]
+    types_sorted = list(sorted_top) + others
+    rank2 = {m: k for k, m in enumerate(types_sorted)}
+    ordered_indices = sorted(rank2.keys(), key=lambda i: rank2[i])
+    vol_obs = vol_obs[:, ordered_indices]
+    obs_names = [obs_names[i] for i in ordered_indices]
+
+    n_bars = vol_obs.shape[0]
+    p_categories = vol_obs.shape[1]
+
+    x = np.arange(n_bars) + 2025
+    bottom = np.zeros(n_bars)
+    top = np.zeros(n_bars)
+    fig, ax = plt.subplots(figsize=(10, 6))
+    plt.grid(axis="y", color="grey", linestyle="--")
+
+    for i in range(p_categories):
+        top = top + vol_obs[:, i]
+        if i < 24:
+            ax.fill_between(
+                x,
+                bottom,
+                top,
+                label=obs_names[i],
+                color=color_mix[i],
+                linewidth=0,
+                alpha=0.9,
+            )
+            bottom = top
+        elif i < 48:
+            ax.fill_between(
+                x,
+                bottom,
+                top,
+                label=obs_names[i],
+                color=color_mix[i - 24],
+                linewidth=0,
+                alpha=0.9,
+                hatch="..",
+                edgecolor="0.2",
+            )
+            bottom = top
+    mpl.rcParams["hatch.color"] = "white"
+    ax.fill_between(
+        x,
+        bottom,
+        top,
+        alpha=0.9,
+        color="grey",
+        linewidth=0,
+        edgecolor="white",
+        label="Others",
+        hatch="//",
+    )
+    ax.legend(
+        framealpha=1,
+        bbox_to_anchor=(1.05, 1),
+        loc="upper left",
+        borderaxespad=0.0,
+        ncol=2,
+    )
+
+    plt.xlim(x.min(), x.max())
+    plt.ylim(0, 1.1 * top.max())
+    plt.xlabel("Years")
+    plt.ylabel(obs_name)
+    plt.tight_layout()
+    plt.show()
+    return None
+
+def visu_retirement_age(vol_obs, obs_names, color_mix=colors_26):
+    """Average retirement age (and operating age) per type from a 3D array (T, A, M)."""
+    totals = vol_obs.sum(axis=(0, 1))
+    top_k = min(48, vol_obs.shape[2])
+    top_indices = np.argsort(-totals)[:top_k]
+
+    t = np.arange(vol_obs.shape[0])
+    mean_date = {}
+    for m in top_indices:
+        if totals[m] > 0:
+            mean_date[m] = (t * (vol_obs[:, :, m].sum(axis=1))).sum() / totals[m]
+        else:
+            mean_date[m] = -np.inf
+
+    sorted_top = sorted(top_indices, key=lambda m: -mean_date[m])
+    others = [m for m in range(vol_obs.shape[2]) if m not in sorted_top]
+    types_sorted = list(sorted_top) + others
+    rank2 = {m: k for k, m in enumerate(types_sorted)}
+    ordered_indices = sorted(rank2.keys(), key=lambda i: rank2[i])
+
+    ages_y = np.arange(vol_obs.shape[1])
+    ages_t = np.arange(vol_obs.shape[0])[:-1]
+    ages_t_y = ages_t[:, None] - ages_y[None, :] + vol_obs.shape[1] - vol_obs.shape[0]
+
+    vol_obs = vol_obs[:, :, ordered_indices]
+    obs_names = [obs_names[i] for i in ordered_indices]
+    retirements_seats_volumes_ini = -np.diff(vol_obs, axis=0)
+    retirements_seats_volumes_ini[vol_obs[:-1] == 0] = 0
+
+    n_years = (retirements_seats_volumes_ini * ages_t_y[:, :, None]).sum(axis=1)
+    volumes = retirements_seats_volumes_ini.sum(axis=1)
+
+    x = t[:-1] + 2025
+    fig, ax = plt.subplots(figsize=(10, 5.5))
+    ax.grid(axis="y", color="grey", linestyle="--")
+    for ac in range(len(obs_names)):
+        y = np.divide(
+            n_years[:, ac],
+            volumes[:, ac],
+            out=np.full_like(n_years[:, ac], np.nan, dtype=float),
+            where=volumes[:, ac] != 0,
+        )
+        mask = (
+            np.isfinite(x)
+            & np.isfinite(y)
+            & (retirements_seats_volumes_ini[:, :, ac].sum(axis=1) > 500)
+        )
+        y[~mask] = np.nan
+        if not np.any(mask):
+            continue
+        if ac < 23:
+            ax.plot(x, y, "-", color=color_mix[ac], markersize=2, label=obs_names[ac], linewidth=1)
+        else:
+            ax.plot(
+                x,
+                y,
+                "--",
+                color='0.4',
+                markersize=2,
+                linewidth=0.5,
+            )
+    y_agg = np.divide(
+        n_years.sum(axis=1),
+        volumes.sum(axis=1),
+        out=np.full_like(n_years.sum(axis=1), np.nan, dtype=float),
+        where=volumes.sum(axis=1) != 0,
+    )
+    mask = (
+        np.isfinite(x) & np.isfinite(y_agg) & (retirements_seats_volumes_ini.sum(axis=(1, 2)) > 500)
+    )
+    y_agg[~mask] = np.nan
+    ax.plot(x, y_agg, "*-", color="black", markersize=5, label="avg ret age", linewidth=2)
+
+    operating_years = (vol_obs[:-1, :, :] * ages_t_y[:, :, None]).sum(axis=(1, 2))
+    operating_volumes = vol_obs[:-1, :, :].sum(axis=(1, 2))
+    ax.plot(
+        x,
+        operating_years / operating_volumes,
+        "*-",
+        color=(1, 0, 1),
+        markersize=5,
+        label="avg op age",
+        linewidth=2,
+    )
+
+    plt.xlim(xmin=2025, xmax=2025 + vol_obs.shape[0])
+    plt.ylim(0)
+    plt.xlabel("Years")
+    plt.ylabel("Average retirement age")
+    plt.legend(ncol=2, title="Retirements volumes > 500 seats per year", bbox_to_anchor=(1.05, 1))
+    plt.tight_layout()
     plt.show()
     return None

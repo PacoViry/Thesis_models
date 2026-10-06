@@ -25,7 +25,7 @@ importlib.reload(vis_ref)
 #3) To connect aircraft caracteristics and assignment coefficients.
 
 
-def data_formatting(df, seuils_f = 0.01, n_ac = 60, obs = 'ASK', weight = True, save_techn_carac = False, airports = False, aircraft_operator= False):
+def data_formatting(df, seuils_f = 0.01, n_ac = 60, obs = 'ASK', weight = True, save_techn_carac = False, airports = False, aircraft_operator= False, seats= True):
     if airports :
         add = ['ADES', 'ADEP']
     else :
@@ -52,8 +52,12 @@ def data_formatting(df, seuils_f = 0.01, n_ac = 60, obs = 'ASK', weight = True, 
         l_dist.append([ac, d_0, s, ac_name])
         df_f1 = df_f1[~(mask & (df_f1['Distance_conn (km)'] > s))]
         if save_techn_carac:
-            l_seats.append((df_f1.loc[mask,obs+'_w']*df_f1.loc[mask,'Seats']/df_f1.loc[mask,'N_flights']).sum()/(df_f1.loc[mask,obs+'_w'].sum()))
             l_w.append(w_obs)
+            if seats:
+                l_seats.append(
+                    (df_f1.loc[mask, obs + '_w'] * df_f1.loc[mask, 'Seats'] / df_f1.loc[mask, 'N_flights']).sum() / (
+                        df_f1.loc[mask, obs + '_w'].sum()))
+
     #identification of years and types for the regression
     l_dist = np.array(l_dist)
     unique_ids = l_dist[:, 0]
@@ -64,8 +68,12 @@ def data_formatting(df, seuils_f = 0.01, n_ac = 60, obs = 'ASK', weight = True, 
     df_f2 = df_f1.merge(corr_table, on=['Aircraft Type', 'Aircraft Type Name'], how='left').drop(columns=['Aircraft Type', 'Aircraft Type Name'])
     df_f2['Period'] = df_f2['Period'] - period_min
     if save_techn_carac:
-        df_tech = pd.DataFrame({'Aircraft Type': unique_ids,'Aircraft Type Name': unique_names, obs+'_weight': l_w,'Est_avg_seats': l_seats,  'Est_max_range': max_dist})
+        if seats:
+            df_tech = pd.DataFrame({'Aircraft Type': unique_ids,'Aircraft Type Name': unique_names, obs+'_weight': l_w,'Est_avg_seats': l_seats,  'Est_max_range': max_dist})
+        else:
+            df_tech = pd.DataFrame({'Aircraft Type': unique_ids,'Aircraft Type Name': unique_names, obs+'_weight': l_w, 'Est_max_range': max_dist})
         df_tech.to_excel('data//assignment_tech//BTS_'+obs+'_'+str(n_ac)+'_'+str(n_y)+'.xlsx')
+
     #volumes modeled per connection (used for validation)
 
     obs_conn_p = (
@@ -333,8 +341,7 @@ def correspondance_table(title_coeffs = 'logit_model_bts_35_5_1_9',title_tech = 
     coeffs = pd.merge(save1, save2, left_index=True, right_index=True).rename(columns={'0_x': 'alphas', '0_y': 'betas'})
     coeffs['alphas']=coeffs['alphas']/d_norm
     coeffs['betas']=coeffs['betas']/cap_norm
-    tech_table = pd.read_excel(excel_path_tech, index_col=0)[
-        ['Aircraft Type Name', obs_choice + '_weight', 'Est_avg_seats', 'Est_max_range']].set_index(
+    tech_table = pd.read_excel(excel_path_tech, index_col=0).set_index(
         'Aircraft Type Name')
     tech_table['Aircraft Type Name'] = tech_table.index
 
@@ -605,7 +612,7 @@ def regressor_assign_coeffs(c_table, weight = False, weight_log = False, obs_cho
         plt.show()
     return np.concatenate([np.array([model1.intercept_]),model1.coef_]), np.concatenate([np.array([model2.intercept_]),model2.coef_])
 
-def regressor_visu_model(c_table, alphas_coeff, betas_coeff, reg_name='test'):
+def regressor_visu_model(c_table, alphas_coeff, betas_coeff, reg_name='test', cap_lims=(40,500), range_lims=(2000,18000)):
     y1 = c_table['alphas']
     y2 = c_table['betas']
     names_ac = c_table['Aircraft Type Name'].to_list()
@@ -614,9 +621,11 @@ def regressor_visu_model(c_table, alphas_coeff, betas_coeff, reg_name='test'):
     p_d = 20
     p_s = 3
     u = 0
-    for sqrt_range in np.linspace(2000.05 ** (1 / p_d), 18000.5 ** (1 / p_d), 19):
+    cap_min, cap_max = cap_lims
+    range_min, range_max = range_lims
+    for sqrt_range in np.linspace((range_min+0.5) ** (1 / p_d), (range_max+0.5) ** (1 / p_d), 19):
         ranges = 50 * int(sqrt_range ** p_d / 50)
-        inputs = np.array([ranges * np.ones(500), np.linspace(40.5 ** (1 / p_s), 500.5 ** (1 / p_s), 500) ** p_s]).T
+        inputs = np.array([ranges * np.ones(500), np.linspace((cap_min+0.5) ** (1 / p_s), (cap_max+0.5) ** (1 / p_s), 500) ** p_s]).T
         sample_x = np.concatenate((inputs, np.log(inputs), 1 / inputs), axis=1)
         alphas_sample = alphas_coeff[0]+ (alphas_coeff[1:][:, None] * sample_x.T).sum(axis =0)
         betas_sample = betas_coeff[0]+ (betas_coeff[1:][:, None] * sample_x.T).sum(axis =0)
@@ -626,9 +635,9 @@ def regressor_visu_model(c_table, alphas_coeff, betas_coeff, reg_name='test'):
         #   plt.plot(alphas_sample, betas_sample, color = 'b', linewidth = 0.5, linestyle = '--', alpha = 0.2)
         u += 1
     u = 0
-    for cap in np.linspace(40.5 ** (1 / p_s), 500.5 ** (1 / p_s), 19):
+    for cap in np.linspace((cap_min+0.5) ** (1 / p_s), (cap_max+0.5) ** (1 / p_s), 19):
         cap = 5 * int(cap ** p_s / 5)
-        inputs = np.array([np.linspace(2000.05**(1/p_d),18000.5**(1/p_d),500)**p_d,cap*np.ones(500)]).T
+        inputs = np.array([np.linspace((range_min+0.5)**(1/p_d),(range_max+0.5)**(1/p_d),500)**p_d,cap*np.ones(500)]).T
         sample_x = np.concatenate((inputs, np.log(inputs), 1 / inputs), axis=1)
         alphas_sample = alphas_coeff[0] + alphas_coeff[1:] @ sample_x.T
         betas_sample = betas_coeff[0] + betas_coeff[1:] @ sample_x.T
@@ -638,11 +647,11 @@ def regressor_visu_model(c_table, alphas_coeff, betas_coeff, reg_name='test'):
         #   plt.plot(alphas_sample, betas_sample, color = 'r', linewidth = 0.5, linestyle = '--', alpha = 0.2)
         u += 1
     ann1 = np.array(
-        [50 * np.trunc(np.linspace(2000.05 ** (1 / p_d), 18000.5 ** (1 / p_d), 10) ** p_d / 50), 40 * np.ones(10)]).T
+        [50 * np.trunc(np.linspace((range_min+0.5) ** (1 / p_d), (range_max+0.5)** (1 / p_d), 10) ** p_d / 50), cap_min * np.ones(10)]).T
     ann2 = np.concatenate((ann1, np.log(ann1), 1 / ann1), axis=1)
     alphas_sample = alphas_coeff[0] + alphas_coeff[1:] @ ann2.T
     betas_sample = betas_coeff[0] + betas_coeff[1:] @ ann2.T
-    for i, label in enumerate(np.linspace(2000.05 ** (1 / p_d), 18000.5 ** (1 / p_d), 10) ** p_d):
+    for i, label in enumerate(np.linspace((range_min+0.5) ** (1 / p_d), (range_max+0.5) ** (1 / p_d), 10) ** p_d):
         plt.scatter(alphas_sample[i], betas_sample[i], color="darkblue", zorder=3, s=5, marker='s')
         plt.annotate(
             str(50 * int(label / 50+0.5)),  # Le label à afficher
@@ -652,11 +661,11 @@ def regressor_visu_model(c_table, alphas_coeff, betas_coeff, reg_name='test'):
             fontsize=8,  # Taille de la police
             color="darkblue"  # Couleur des annotations
         )
-    ann3 = np.array([2000*np.ones(10),5*np.trunc(np.linspace(40.5**(1/p_s),500.5**(1/p_s),10)**p_s/5)]).T
+    ann3 = np.array([range_min*np.ones(10),5*np.trunc(np.linspace((cap_min+0.5)**(1/p_s),(cap_max+0.5)**(1/p_s),10)**p_s/5)]).T
     ann4 = np.concatenate((ann3, np.log(ann3), 1 / ann3), axis=1)
     alphas_sample = alphas_coeff[0] + alphas_coeff[1:] @ ann4.T
     betas_sample = betas_coeff[0] + betas_coeff[1:] @ ann4.T
-    for i, label in enumerate(np.linspace(40.5 ** (1 / p_s), 500.5 ** (1 / p_s), 10) ** p_s):
+    for i, label in enumerate(np.linspace((cap_min+0.5) ** (1 / p_s), (cap_max+0.5) ** (1 / p_s), 10) ** p_s):
         plt.scatter(alphas_sample[i], betas_sample[i], color="darkred", zorder=3, s=5, marker='s')
         plt.annotate(
             str(5 * int(label / 5+0.5)),  # Le label à afficher
@@ -722,6 +731,8 @@ def regressor_visu_model(c_table, alphas_coeff, betas_coeff, reg_name='test'):
     plt.gca().xaxis.get_major_formatter().set_powerlimits((-1, 1))
     plt.xlabel(r'$\beta_1$ : Impact of distance on logistic score', fontsize=14)
     plt.ylabel(r'$\beta_2$ : Impact of log(capacity) on logistic score', fontsize=14)
+    plt.xlim((-7e-3, 4e-3))
+    plt.ylim((-2, 3))
     plt.savefig('figures//estimators_figures//visu_regressor_' + reg_name + '.pdf', bbox_inches="tight", format='pdf')
     plt.show()
 
