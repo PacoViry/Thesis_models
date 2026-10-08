@@ -58,13 +58,13 @@ def compute_fleet_composition(initial_fleet, deliveries, obs_sizes, traffic_q,
 
         fleet_obs_t = (
             fleet_pot_t * obs_sizes[None, :] * taux_utilisation_usuel *
-            np.exp(aging_activity_coeff * (-y_s + 1 - t * period_duration + age_array))[:, None]
+            np.exp(aging_activity_coeff * (-y_s  - t * period_duration + age_array))[:, None]
         )
+
         fleet_obs_act_t, x_eq = fleet_content_modelling.fleet_content(
             0, x_eq, fleet_obs_t, retirement_propensions,
             tot_obs[t], epsilon=precision, first=True
         )
-
         if x_eq < 1e-30:
             x_eq = x_eq ** (1 / 8)
             retirement_propensions = retirement_propensions - 3 * np.log(2)
@@ -135,7 +135,7 @@ def compute_fleet_assignment(vol_act, traffic_structures,
 
 
 def observe_scenario(alphas, betas,ranges, omegas, types_names, traffic_structures, period_duration=1, observation = 'Av_ac_seats',
-                     obs_sizes = None, dic_fuel = None, vals_fuel = None,period_ref = None,add_period = 0, save_name = 'scenario_test', reso=400,label_size_param = 1):
+                     obs_sizes = None, dic_fuel = None, vals_fuel = None,period_ref = None,add_period = 0, save_name = 'scenario_test', smooth_param = 0.05, reso=400,label_size_param = 1):
     if period_ref is None :
         period_ref = omegas.shape[0] - 1
     if observation is None :
@@ -144,20 +144,20 @@ def observe_scenario(alphas, betas,ranges, omegas, types_names, traffic_structur
                          add_period=add_period, types_names=types_names,
                          video_name=save_name+'_Av_ac_seats', format_v='video', color_mix=vis_ref.colors_26,
                          market='Aircraft Type', observation='Av_ac_seats', dist_limits=(4e2, 1.9e4),
-                         capac_limits=(9e3, 4e6),period_duration=period_duration,
+                         capac_limits=(9e3, 4e6),period_duration=period_duration,smooth_param=smooth_param,
                          frame_s=8, period_ref=period_ref, reso=reso,label_size_param = label_size_param)
         print('ASK')
         dynamic_pred_vis(traffic_structures, alphas, betas, ranges, omegas, list(range(omegas.shape[0])),
                          add_period=add_period, types_names=types_names, obs_sizes=obs_sizes,
                          video_name='test_sc_obs_market'+'_ASK', format_v='video', color_mix=vis_ref.colors_26,
                          market='Aircraft Type', observation='ASK', dist_limits=(4.9e2, 1.9e4),
-                         capac_limits=(1.9e4, 6e6),period_duration=period_duration,
+                         capac_limits=(1.9e4, 6e6),period_duration=period_duration,smooth_param=smooth_param,
                          frame_s=8, period_ref=period_ref, reso=reso,label_size_param = label_size_param)
         print('FB')
         dynamic_pred_vis(traffic_structures, alphas, betas, ranges, omegas, list(range(omegas.shape[0])),
                          add_period=add_period, types_names=types_names,obs_sizes=obs_sizes,
                          video_name='test_sc_obs_market'+'_FB', format_v='video', color_mix=vis_ref.colors_26,
-                         market='Aircraft Type', observation='FB', dist_limits=(4.9e2, 1.9e4),
+                         market='Aircraft Type', observation='FB', dist_limits=(4.9e2, 1.9e4),smooth_param=smooth_param,
                          capac_limits=(1.9e4, 6e6), frame_s=8, period_ref=0,period_duration=period_duration,
                          dic_fuel = dic_fuel, vals_fuel = vals_fuel, reso=reso,label_size_param = label_size_param)
         return None
@@ -168,7 +168,7 @@ def observe_scenario(alphas, betas,ranges, omegas, types_names, traffic_structur
     dynamic_pred_vis(traffic_structures, alphas, betas, ranges, omegas, list(range(omegas.shape[0])),
                         add_period=add_period, types_names=types_names,obs_sizes=obs_sizes,
                          video_name=save_name+'_'+observation, format_v='video', color_mix=vis_ref.colors_26,
-                         market='Aircraft Type', observation=observation, dist_limits=(4.9e2, 1.9e4),
+                         market='Aircraft Type', observation=observation, dist_limits=(4.9e2, 1.9e4),smooth_param=smooth_param,
                          capac_limits=(1.9e4, 6e6), frame_s=4, period_ref=period_ref,period_duration=period_duration,
                          dic_fuel = dic_fuel, vals_fuel = vals_fuel, reso=reso,label_size_param = label_size_param)
     return None
@@ -221,7 +221,7 @@ def agg_ind_g(df, observation):
 def dynamic_pred_vis(traff_structures, alphas, betas, ranges, omegas, periods, obs_sizes = None, types_names = None, add_period = None,
                      video_name = 'test_video_market', format_v = 'gif', color_mix = vis_ref.colors_26,
                      market = 'Aircraft Type',observation = 'Av_ac_seats', dist_limits = (4e2, 1.9e4), capac_limits = (9e3, 5e6),
-                     frame_s = 2, period_ref = None, n_market = 33,reso = 400, smooth_param = 0.04,
+                     frame_s = 2, period_ref = None, n_market = 33,reso = 400, smooth_param = 0.05,
                      period_duration = 1,label_size_param = 1,dic_fuel = None, vals_fuel = None):
     name_periods = periods
     if types_names is None:
@@ -233,9 +233,9 @@ def dynamic_pred_vis(traff_structures, alphas, betas, ranges, omegas, periods, o
     dimensions = (14, 10)
     width_grid, height_grid = 21, 8
     width_main, height_main = 17, 5
-    smooth_x = (np.log(dist_limits[1] - np.log(dist_limits[0]))) * smooth_param / (
+    smooth_x = 2.5*(np.log(dist_limits[1]) - np.log(dist_limits[0])) * smooth_param / (
             dimensions[0] * width_main / width_grid)
-    smooth_y = (np.log(capac_limits[1] - np.log(capac_limits[0]))) * smooth_param / (
+    smooth_y = 2.5*(np.log(capac_limits[1]) - np.log(capac_limits[0]))* smooth_param / (
             dimensions[
                 1] * height_main / height_grid)  # seulement pour combler le lissage de la figure précédent, peut être un sujet à adapter
 
@@ -389,7 +389,7 @@ def dynamic_pred_vis(traff_structures, alphas, betas, ranges, omegas, periods, o
         assignment_analysis.market_vis(df_p,name_fig ='video_'+str(100+i), color_mix = color_mix, rank = rank, color_rank = sol,
                    market = market, observation = observation, dist_limits = dist_limits, capac_limits = capac_limits, n_market = n_market,
                    m_x_ref= traff_x_max, m_y_ref = traff_y_max, ask_d_ref = ask_max, video = True, title_fig = name_periods[i]+add_period,
-                    smooth_param = smooth_param, weight = None, reso = reso,label_size_param=label_size_param,synthetic_mode = True)
+                    smooth_param = smooth_param, weight = False, reso = reso,label_size_param=label_size_param,synthetic_mode = True)
 
     #Animation des images
     image_files = sorted(glob.glob("figures/video_storage/*.png"))

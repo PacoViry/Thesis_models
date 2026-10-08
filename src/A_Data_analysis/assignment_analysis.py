@@ -116,13 +116,7 @@ def market_vis(df_o, name_fig ='test_market', title_fig = None,  color_mix = vis
     selec = selec_0[market]
     selec_n = selec_0[market+' Name']
     if synthetic_mode:  ## volume per connection does not reflect the cumulated values
-        if weight:
-            traff_matrix, x, y = vis_ref.smooth_ln_2d(np.array(df['Distance_conn (km)']),
-                                            np.array(df['Seats_conn_p']) / period_duration,
-                                        np.array(df[observation]) * np.array(
-                                                    df['Weight']), dist_limits,capac_limits, reso, smooth_x, smooth_y)
-        else:
-            traff_matrix, x, y = vis_ref.smooth_ln_2d(np.array(df['Distance_conn (km)']), np.array(df['Seats_conn_p']) / period_duration,
+        traff_matrix, x, y = vis_ref.smooth_ln_2d(np.array(df['Distance_conn (km)']), np.array(df['Seats_conn_p']) / period_duration,
             np.array(df[observation]), dist_limits, capac_limits, reso, smooth_x, smooth_y)
     else:
         if weight:
@@ -283,7 +277,10 @@ def market_vis(df_o, name_fig ='test_market', title_fig = None,  color_mix = vis
     y_density_ax.set_xticks([])  # Cacher les ticks sur cet axe
     y_density_ax.yaxis.set_major_locator(mticker.LogLocator(base=10, subs=(1, 2, 5)))
     y_density_ax.yaxis.set_minor_locator(mticker.LogLocator(base=10, subs=(3, 4, 6, 7, 8, 9)))
-    y_density_ax.set_xlabel(observation +'\n'+'distribution (2)', fontsize=14)
+    if observation == 'Av_ac_seats':
+        y_density_ax.set_xlabel('Aircraft activity' + '\n' + 'distribution (2)', fontsize=14)
+    else:
+        y_density_ax.set_xlabel(observation +'\n'+'distribution (2)', fontsize=14)
     y_density_ax.tick_params(axis='y',which='both',left=False,right=False,labelleft=False)
     # Grille horizontale uniquement
     y_density_ax.grid(True, axis='y', which='major', linestyle='--', linewidth=0.5, color='0.3')
@@ -596,10 +593,11 @@ def assign_vis(df, market_seg, name_fig ='test_assign', title_fig = None, market
     width_main, height_main = 17, 5
     if weight == True:
         df[observation] = df[observation]* df['Weight']
-    smooth_x = (np.log(dist_limits[1] - np.log(dist_limits[0]))) * smooth_param / (
-                dimensions[0] * width_main / width_grid)
-    smooth_y = (np.log(capac_limits[1] - np.log(capac_limits[0]))) * smooth_param / (
-                dimensions[1] * height_main / height_grid) #seulement pour comier le lissage de la figure précédent, peut être un sujet à adapter
+    smooth_x = 2.7*(np.log(dist_limits[1]) - np.log(dist_limits[0])) * smooth_param / (
+            dimensions[0] * width_main / width_grid)
+    smooth_y = 2.7*(np.log(capac_limits[1]) - np.log(capac_limits[0])) * smooth_param / (
+            dimensions[
+                1] * height_main / height_grid) #seulement pour comier le lissage de la figure précédent, peut être un sujet à adapter
     dimensions = (10, 6)
     fig = plt.figure(figsize=dimensions)
 
@@ -755,9 +753,9 @@ def dynamic_market_vis(df, periods, name_periods = None, video_name = 'test_vide
     width_main, height_main = 17, 5
     if weight :
         selec_df[observation] = selec_df[observation]* selec_df['Weight']
-    smooth_x = (np.log(dist_limits[1] - np.log(dist_limits[0]))) * smooth_param / (
+    smooth_x = 2.7*(np.log(dist_limits[1]) - np.log(dist_limits[0])) * smooth_param / (
             dimensions[0] * width_main / width_grid)
-    smooth_y = (np.log(capac_limits[1] - np.log(capac_limits[0]))) * smooth_param / (
+    smooth_y = 2.7*(np.log(capac_limits[1]) - np.log(capac_limits[0])) * smooth_param / (
             dimensions[
                 1] * height_main / height_grid)  # seulement pour comier le lissage de la figure précédent, peut être un sujet à adapter
 
@@ -979,7 +977,7 @@ def dynamic_assign_vis(df, market_seg, periods, name_periods = None, video_name 
 
 def average_seats_vis(df1, name_fig ='test_avg_seats', title_fig = None, observation = 'ASK',
                dist_limits =(4e2, 1.9e4), capac_limits = (9e3, 4e6),reso=400, smooth_param = 0.05, video = False,
-               period_duration = 1, weight = True, vmax= None,  format_fig = 'pdf'):
+               period_duration = 1, weight = True, vmax= None,  format_fig = 'pdf', synthetic_mode= False):
     # market_seg est une liste contenant tous les identifiants à étudier.
     dimensions = (14, 10)
     width_grid, height_grid = 21, 8
@@ -987,30 +985,40 @@ def average_seats_vis(df1, name_fig ='test_avg_seats', title_fig = None, observa
     df= df1.copy()
     if weight == True:
         df[observation] = df[observation]* df['Weight']
-    smooth_x = (np.log(dist_limits[1] - np.log(dist_limits[0]))) * smooth_param / (
-                dimensions[0] * width_main / width_grid)
-    smooth_y = (np.log(capac_limits[1] - np.log(capac_limits[0]))) * smooth_param / (
-                dimensions[1] * height_main / height_grid) #seulement pour comier le lissage de la figure précédent, peut être un sujet à adapter
+    smooth_x = 2.7*(np.log(dist_limits[1]) - np.log(dist_limits[0])) * smooth_param / (
+            dimensions[0] * width_main / width_grid)
+    smooth_y = 2.7*(np.log(capac_limits[1]) - np.log(capac_limits[0])) * smooth_param / (
+            dimensions[
+                1] * height_main / height_grid) #seulement pour comier le lissage de la figure précédent, peut être un sujet à adapter
 
 
     dimensions = (10, 7)
     fig = plt.figure(figsize=dimensions)
 
     # global distribution
-    if weight:
-        int_traff = df[list({'ADEP', 'ADES', 'Period', 'Distance_conn (km)', 'Seats_conn_p', observation + '_conn_p',
-                        'Weight'})].drop_duplicates(subset=['ADES', 'ADEP'], keep='first')[
-            list({'ADEP', 'ADES', 'Period','Distance_conn (km)', 'Seats_conn_p', observation + '_conn_p', 'Weight'})]
-        traff_matrix, x, y = vis_ref.smooth_ln_2d(np.array(int_traff['Distance_conn (km)']),
-                                        np.array(int_traff['Seats_conn_p']) / period_duration,
-                                    np.array(int_traff[observation + '_conn_p']) * np.array(
-                                                int_traff['Weight']), dist_limits,capac_limits, reso, smooth_x, smooth_y)
+    if synthetic_mode:  ## volume per connection does not reflect the cumulated values
+        traff_matrix, x, y = vis_ref.smooth_ln_2d(np.array(df['Distance_conn (km)']),
+                                                  np.array(df['Seats_conn_p']) / period_duration,
+                                                  np.array(df[observation]), dist_limits, capac_limits, reso, smooth_x,
+                                                  smooth_y)
     else:
-        int_traff = df[list({'ADEP', 'ADES', 'Period', 'Distance_conn (km)', 'Seats_conn_p', observation + '_conn_p'})].drop_duplicates(
-        subset = ['ADES', 'ADEP'], keep = 'first')[list({'ADEP', 'ADES','Distance_conn (km)', 'Seats_conn_p', observation + '_conn_p', 'Period'})]
-        traff_matrix, x, y = vis_ref.smooth_ln_2d(np.array(int_traff['Distance_conn (km)']),
-            np.array(int_traff['Seats_conn_p']) / period_duration, np.array(int_traff[observation + '_conn_p']),
-            dist_limits, capac_limits, reso, smooth_x, smooth_y)
+        if weight:
+            int_traff = df[list({'ADEP', 'ADES', 'Distance_conn (km)', 'Seats_conn_p', observation + '_conn_p',
+                                 'Weight'})].drop_duplicates(subset=['ADES', 'ADEP'], keep='first')[
+                list({'Distance_conn (km)', 'Seats_conn_p', observation + '_conn_p', 'Weight'})]
+            traff_matrix, x, y = vis_ref.smooth_ln_2d(np.array(int_traff['Distance_conn (km)']),
+                                                      np.array(int_traff['Seats_conn_p']) / period_duration,
+                                                      np.array(int_traff[observation + '_conn_p']) * np.array(
+                                                          int_traff['Weight']), dist_limits, capac_limits, reso,
+                                                      smooth_x, smooth_y)
+        else:
+            int_traff = df[list({'ADEP', 'ADES', 'Distance_conn (km)', 'Seats_conn_p', observation + '_conn_p'})].drop_duplicates(
+                subset=['ADES', 'ADEP'], keep='first')[
+                list({'Distance_conn (km)', 'Seats_conn_p', observation + '_conn_p'})]
+            traff_matrix, x, y = vis_ref.smooth_ln_2d(np.array(int_traff['Distance_conn (km)']),
+                                                      np.array(int_traff['Seats_conn_p']) / period_duration,
+                                                      np.array(int_traff[observation + '_conn_p']), dist_limits,
+                                                      capac_limits, reso, smooth_x, smooth_y)
     traff_matrix = traff_matrix.transpose()
     X = np.exp(x)
     Y = np.exp(y)
@@ -1030,7 +1038,7 @@ def average_seats_vis(df1, name_fig ='test_avg_seats', title_fig = None, observa
     if vmax is None:
         vmax = 10*int(np.max(ratio)/10)+10
 
-    plt.text(310, 25000, '99% of air traffic', fontsize=15, zorder=6)
+    plt.text(600, 4000000, '99% of air traffic', fontsize=15, zorder=6)
 
     l_cs = [100, 150, 200, 300, 450]
     # lw_cs = [1.2,1.2, 1.2, 2, 2]
@@ -1165,13 +1173,13 @@ def inflation_calculations(df1_0, df2_0,observation='ASK', reso = 500, smooth_pa
         df1[observation] = df1[observation]* df1['Weight']
         df2[observation] = df2[observation]* df2['Weight']
 
-    # seulement pour comier le lissage des figures précédentes, peut être un sujet à adapter
+    # seulement pour copier le lissage des figures précédentes, peut être un sujet à adapter
     dimensions = (14, 10)
     width_grid, height_grid = 21, 8
     width_main, height_main = 17, 5
-    smooth_x = (np.log(dist_limits[1] - np.log(dist_limits[0]))) * smooth_param / (
+    smooth_x = 2.7*(np.log(dist_limits[1]) - np.log(dist_limits[0])) * smooth_param / (
             dimensions[0] * width_main / width_grid)
-    smooth_y = (np.log(capac_limits[1] - np.log(capac_limits[0]))) * smooth_param / (
+    smooth_y = 2.7*(np.log(capac_limits[1]) - np.log(capac_limits[0])) * smooth_param / (
             dimensions[
                 1] * height_main / height_grid)
 
@@ -1207,51 +1215,56 @@ def inflation_calculations(df1_0, df2_0,observation='ASK', reso = 500, smooth_pa
     traff_matrix_selec2 = traff_matrix_selec2.transpose()
     ratio2 = traff_matrix_selec2 / traff_matrix2
 
+    eps = 1e-9 * max(traff_matrix1.max(), traff_matrix2.max())
     filter = (
             np.isfinite(ratio1)
             & np.isfinite(ratio2)
-            & np.isfinite(traff_matrix1)
-            & np.isfinite(traff_matrix_selec1)
-            & np.isfinite(traff_matrix2)
-            & np.isfinite(traff_matrix_selec2)
+            & (traff_matrix1 > eps)
+            & (traff_matrix2 > eps)
     )
-    seats1 = (ratio1[filter]*(traff_matrix1[filter]+traff_matrix2[filter])).sum()
-    seats2 = (ratio2[filter]*(traff_matrix1[filter]+traff_matrix2[filter])).sum()
-    return(seats2/seats1)
 
-def inflation_evolution(traff_1, observation= 'ASK'):
-    traff_1990 = traff_1[traff_1['Period'].isin([1990])]
+    common_weight = traff_matrix1 + traff_matrix2
+    avg_seats1 = (ratio1[filter] * common_weight[filter]).sum() / common_weight[filter].sum()
+    avg_seats2 = (ratio2[filter] * common_weight[filter]).sum() / common_weight[filter].sum()
+    return(avg_seats2/avg_seats1)
+
+def inflation_evolution(traff_1, observation= 'ASK', dates_list=None, weight = True, ylim=(-0.11, 0.18)):
+    if dates_list is None:
+        dates_list = list(range(1990,2020)) + [2025]
+
+    traff_mini = traff_1[traff_1['Period'].isin([min(dates_list)])]
     time_t_inflation = [0]
     cum_inflation = [0]
-    seats_t = [(traff_1990['Seats_ac'] * traff_1990[observation] * traff_1990['Weight']).sum() / (
-                traff_1990[observation] * traff_1990['Weight']).sum()]
-
-    for t in range(1991, 2020):
-        print(t)
-        traff_obs_1 = traff_1[traff_1['Period'].isin([t - 1])]
+    if weight:
+        seats_t = [(traff_mini['Seats_ac'] * traff_mini[observation] * traff_mini['Weight']).sum() / (
+                traff_mini[observation] * traff_mini['Weight']).sum()]
+    else:
+        seats_t = [(traff_mini['Seats_ac'] * traff_mini[observation]).sum() / (
+                traff_mini[observation]).sum()]
+    traff_obs_1 = traff_1[traff_1['Period'].isin([dates_list[0]])]
+    for t in dates_list[1:]:
+        if t%5 ==0:
+            print(t)
         traff_obs_2 = traff_1[traff_1['Period'].isin([t])]
-        seats_t.append((traff_obs_2['Seats_ac'] * traff_obs_2[observation] * traff_obs_2['Weight']).sum() / (
+        if weight:
+            seats_t.append((traff_obs_2['Seats_ac'] * traff_obs_2[observation] * traff_obs_2['Weight']).sum() / (
                     traff_obs_2[observation] * traff_obs_2['Weight']).sum())
-        i_t = inflation_calculations(traff_obs_1, traff_obs_2, observation = observation)
+        else:
+            seats_t.append((traff_obs_2['Seats_ac'] * traff_obs_2[observation]).sum() / (
+                    traff_obs_2[observation]).sum())
+        i_t = inflation_calculations(traff_obs_1, traff_obs_2, observation = observation, weight = weight)
         time_t_inflation.append(i_t - 1)
         cum_inflation.append(i_t * (1 + cum_inflation[-1]) - 1)
+        traff_obs_1 = traff_obs_2.copy()
 
-    traff_obs_1 = traff_1[traff_1['Period'].isin([2019])]
-    traff_obs_2 = traff_1[traff_1['Period'].isin([2025])]
-    seats_t.append((traff_obs_2['Seats_ac'] * traff_obs_2[observation] * traff_obs_2['Weight']).sum() / (
-                traff_obs_2[observation] * traff_obs_2['Weight']).sum())
-    i_t = inflation_calculations(traff_obs_1, traff_obs_2, observation = observation)
-    time_t_inflation.append(i_t - 1)
-    cum_inflation.append(i_t * (1 + cum_inflation[-5]) - 1)
 
     ##Relative variation of aircraft size
     seats_variation = np.array(seats_t) / seats_t[0] - 1
-    seats_1990 = seats_t[0]
-    years = list(range(1990, 2020)) + [2025]
+    seats_mini = seats_t[0]
     fig, ax = plt.subplots()
 
     ax.plot(
-        years,
+        dates_list,
         seats_variation,
         linestyle='-',
         color='#07004D',
@@ -1260,7 +1273,7 @@ def inflation_evolution(traff_1, observation= 'ASK'):
     )
 
     ax.plot(
-        years,
+        dates_list,
         time_t_inflation,
         linestyle='--',
         color='#289B7D',
@@ -1270,7 +1283,7 @@ def inflation_evolution(traff_1, observation= 'ASK'):
     )
 
     ax.plot(
-        years,
+        dates_list,
         cum_inflation,
         linestyle='-',
         color='#289B7D',
@@ -1281,7 +1294,7 @@ def inflation_evolution(traff_1, observation= 'ASK'):
 
     # --- Filled areas first ---
     ax.fill_between(
-        years,
+        dates_list,
         seats_variation,
         cum_inflation,
         alpha=0.4,
@@ -1289,39 +1302,42 @@ def inflation_evolution(traff_1, observation= 'ASK'):
         color = '#2D82B7'
     )
 
-    ax.axvspan(
-        2020,
-        2024,
-        color='#EB8A90',
-        alpha=1,
-        zorder=3
-    )
-    ax.text(2020, 0.07, 'COVID', color='white', fontsize=13)
+    if min(dates_list) <2020:
+        ax.axvspan(
+            2020,
+            2024,
+            color='#EB8A90',
+            alpha=1,
+            zorder=3
+        )
+        ax.text(2020, 0.07, 'COVID', color='white', fontsize=13)
 
     # --- Secondary y-axis ---
     def relative_to_seats(x):
-        return seats_1990 * (1 + x)
+        return seats_mini * (1 + x)
 
     def seats_to_relative(x):
-        return x / seats_1990 - 1
+        return x / seats_mini - 1
 
     secax = ax.secondary_yaxis(
         'right',
         functions=(relative_to_seats, seats_to_relative)
     )
-
-    secax.set_ylabel(observation+'-weighted avg AC seats', fontsize=13)
+    if observation== 'Av_ac_seats':
+        secax.set_ylabel('Activity-weighted avg AC seats', fontsize=13)
+    else:
+        secax.set_ylabel(observation+'-weighted avg AC seats', fontsize=13)
 
     # --- Formatting ---
     ax.yaxis.set_major_formatter(mticker.PercentFormatter(xmax=1.0))
 
     ax.axhline(0, color='black', linewidth=0.8)
 
-    ax.set_ylim(-0.11, 0.18)
-    ax.set_xlim(1990, 2025)
+    ax.set_ylim(ylim)
+    ax.set_xlim(min(dates_list), max(dates_list))
     ax.grid()
 
     ax.set_ylabel('Relative variations', fontsize=13)
-    ax.legend(framealpha=1, loc='lower left', ncol=2, fontsize=11)
+    ax.legend(framealpha=1, loc='best', ncol=2, fontsize=11)
     plt.savefig('figures/assignment_figures/'+observation+'_weighted_size_indicators.pdf',bbox_inches="tight")
     plt.show()

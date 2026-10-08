@@ -54,7 +54,7 @@ def activity_assignment(df, excel_title, corrective_factor = 1.0, d_seuil=6000, 
     return(None)
 
 
-def ASK_assignment(df, excel_title, corrective_factor = 1.0, d_seuil=5000, v_1=830, v_2=900,v_c = 500, supp=0.5):
+def ASK_assignment(df, excel_title, corrective_factor = 1.0, d_seuil=6000, v_1=860, v_2=910,v_c = 350, supp_NB=0.3, supp_WB=0.4):
     stat_est = pd.read_excel('data/productivity_measures/GT_contr_estimates_' + excel_title + '.xlsx')
     stat_est['abscisse'] = np.log(stat_est['abscisse'])
 
@@ -68,15 +68,15 @@ def ASK_assignment(df, excel_title, corrective_factor = 1.0, d_seuil=5000, v_1=8
         bounds_error=False,
         fill_value=(TAT_appro_lin[0], TAT_appro_lin[-1])
     )
-    df['Estimated FT'] = (((df['Distance_conn (km)'] < d_seuil * corrective_factor) * corrective_factor * df[
-        'Distance_conn (km)'] / v_1 +
-                           (df['Distance_conn (km)'] >= d_seuil * corrective_factor) * corrective_factor * df[
-                               'Distance_conn (km)'] / v_2)
-                          + supp * (1 - np.exp(-df['Distance_conn (km)'] * corrective_factor / v_c * (
-                        v_1 - v_c) / supp)))  # terme à la schlague pour intégrer une grimpe progressive et les 2 asymptotes
+    df['Estimated FT'] = (((df['Distance_conn (km)'] < d_seuil * corrective_factor) * (
+                corrective_factor * df['Distance_conn (km)'] / v_1 + supp_NB * (
+                    1 - np.exp(-df['Distance_conn (km)'] * corrective_factor / (v_c * v_1) * (v_1 - v_c) / supp_NB))))
+                          + (df['Distance_conn (km)'] >= d_seuil * corrective_factor) * (
+                                      corrective_factor * df['Distance_conn (km)'] / v_2 + supp_WB))
+    # terme à la schlague pour intégrer une grimpe progressive et les 2 asymptotes
     vals = np.log(df['Estimated FT'].values + 0.3).flatten()
     gt_cont = linear_interp(vals)
-    df['Seats'] = df['Av_ac_seats']/ ((df['Estimated FT'] + gt_cont) / (24 * 365.25))
+    df['Seats'] = df['Av_ac_seats']/ ((df['Estimated FT'] + gt_cont+0.3) / (24 * 365.25))
     df['ASK'] = df['Seats']*df['Distance_conn (km)']
     return None
 
