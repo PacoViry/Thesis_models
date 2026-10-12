@@ -882,7 +882,7 @@ def visu_retirement_age(vol_obs, obs_names, color_mix=colors_26):
     n_years = (retirements_seats_volumes_ini * ages_t_y[:, :, None]).sum(axis=1)
     volumes = retirements_seats_volumes_ini.sum(axis=1)
 
-    x = t[:-1] + 2025
+    x = t[:-1] + 2026
     fig, ax = plt.subplots(figsize=(10, 5.5))
     ax.grid(axis="y", color="grey", linestyle="--")
     for ac in range(len(obs_names)):
@@ -935,7 +935,7 @@ def visu_retirement_age(vol_obs, obs_names, color_mix=colors_26):
         linewidth=2,
     )
 
-    plt.xlim(xmin=2025, xmax=2025 + vol_obs.shape[0])
+    plt.xlim(xmin=2026, xmax=2026 + vol_obs.shape[0]-2)
     plt.ylim(0)
     plt.xlabel("Years")
     plt.ylabel("Average retirement age")
