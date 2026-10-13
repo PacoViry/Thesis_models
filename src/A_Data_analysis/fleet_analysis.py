@@ -745,7 +745,7 @@ def historic_retirement_age(fleet_db, y_min=2000, y_max=2024):
     ax.set_xlabel("Year", fontsize=13)
     ax.set_ylabel("Age (years)", fontsize=13)
     ax.tick_params(axis='both', which='major', labelsize=12)
-    ax.set_ylim(bottom=0)
+    ax.set_ylim((0,40))
     ax.set_xlim((y_min, y_max))
 
     ax.axvspan(
@@ -936,7 +936,7 @@ def visu_retirement_age(vol_obs, obs_names, color_mix=colors_26):
     )
 
     plt.xlim(xmin=2026, xmax=2026 + vol_obs.shape[0]-2)
-    plt.ylim(0)
+    plt.ylim((0,40))
     plt.xlabel("Years")
     plt.ylabel("Average retirement age")
     plt.legend(ncol=2, title="Retirements volumes > 500 seats per year", bbox_to_anchor=(1.05, 1))
