@@ -1223,12 +1223,14 @@ def inflation_calculations(df1_0, df2_0,observation='ASK', reso = 500, smooth_pa
             & (traff_matrix2 > eps)
     )
 
-    common_weight = traff_matrix1 + traff_matrix2
+    # Use traff_matrix2 as weight (period t) for consistency with AC size evolution
+    # common_weight = traff_matrix2
+    common_weight = traff_matrix2+traff_matrix1
     avg_seats1 = (ratio1[filter] * common_weight[filter]).sum() / common_weight[filter].sum()
     avg_seats2 = (ratio2[filter] * common_weight[filter]).sum() / common_weight[filter].sum()
     return(avg_seats2/avg_seats1)
 
-def inflation_evolution(traff_1, observation= 'ASK', dates_list=None, weight = True, ylim=(-0.11, 0.18)):
+def inflation_evolution(traff_1, observation= 'ASK', dates_list=None, weight = True, ylim=(-0.11, 0.18), title='test'):
     if dates_list is None:
         dates_list = list(range(1990,2020)) + [2025]
 
@@ -1339,5 +1341,5 @@ def inflation_evolution(traff_1, observation= 'ASK', dates_list=None, weight = T
 
     ax.set_ylabel('Relative variations', fontsize=13)
     ax.legend(framealpha=1, loc='best', ncol=2, fontsize=11)
-    plt.savefig('figures/assignment_figures/'+observation+'_weighted_size_indicators.pdf',bbox_inches="tight")
+    plt.savefig('figures/assignment_figures/'+observation+'_weighted_size_indicators'+title+'.pdf',bbox_inches="tight")
     plt.show()

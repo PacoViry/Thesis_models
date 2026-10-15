@@ -612,11 +612,11 @@ def regressor_assign_coeffs(c_table, weight = False, weight_log = False, obs_cho
         plt.show()
     return np.concatenate([np.array([model1.intercept_]),model1.coef_]), np.concatenate([np.array([model2.intercept_]),model2.coef_])
 
-def regressor_visu_model(c_table, alphas_coeff, betas_coeff, reg_name='test', cap_lims=(40,500), range_lims=(2000,18000)):
+def regressor_visu_model(c_table, alphas_coeff, betas_coeff, reg_name='test', cap_lims=(40,500), range_lims=(2000,18000), add_acs=None):
     y1 = c_table['alphas']
     y2 = c_table['betas']
     names_ac = c_table['Aircraft Type Name'].to_list()
-    plt.figure(figsize=(7.5, 5.5))
+    plt.figure(figsize=(8, 5.5))
     plt.grid(True, linestyle='--', linewidth=0.3, color='gray')
     p_d = 20
     p_s = 3
@@ -696,15 +696,38 @@ def regressor_visu_model(c_table, alphas_coeff, betas_coeff, reg_name='test', ca
     n_colors = min(10,-int(np.floor(-n_ac/6)))
     n_col = (n_ac - 1) // 19 + 1
     colors = vis_ref.colors_10[:n_colors]
-    for i in range(min(len(names_ac),58)):
+    for i in range(min(len(names_ac),39)):
         plt.scatter(y1[i], y2[i], s=1.5 * vis_ref.sizes[i // n_colors],
                     color=colors[i % n_colors], marker=vis_ref.marker_type[i // n_colors],
-                    label=names_ac[i][:30], edgecolors='black', linewidth=0.5)
+                    label=names_ac[i][:39], edgecolors='black', linewidth=0.5)
+    # for j in range(39,len(names_ac)):
+    #     plt.scatter(y1[j], y2[j], s=1.5,
+    #                 color='black', marker='x')
     handles, labels = plt.gca().get_legend_handles_labels()
     legend1 = plt.legend(handles=handles, labels=labels,
                          framealpha=1, fontsize=11,
-                         bbox_to_anchor=(1.01, 1.01), ncols=3,
+                         bbox_to_anchor=(1.01, 1.03), ncols=3,
                          title='Measured assignment parameters',labelspacing=0.2, title_fontsize = 13)
+
+    add_handles = []
+    add_labels = []
+    if add_acs is not None:
+        for (i, ac_l) in enumerate(add_acs):
+            name = ac_l[0]
+            range_ac = ac_l[1]
+            seats = ac_l[2]
+            inputs = np.array([[range_ac], [seats]]).T
+            sample_x = np.concatenate((inputs, np.log(inputs), 1 / inputs), axis=1)
+            alphas_sample = alphas_coeff[0] + alphas_coeff[1:] @ sample_x.T
+            betas_sample = betas_coeff[0] + betas_coeff[1:] @ sample_x.T
+            scatter_add = plt.scatter(
+                alphas_sample[0], betas_sample[0],
+                s=9 * vis_ref.sizes[i // n_colors],
+                color=colors[i % n_colors], marker='*',
+                label=name, edgecolors='navy', linewidth=1, zorder = 2
+            )
+            add_handles.append(scatter_add)
+            add_labels.append(name)
 
     # Ajoute la première légende à l'axe
     plt.gca().add_artist(legend1)
@@ -726,14 +749,41 @@ def regressor_visu_model(c_table, alphas_coeff, betas_coeff, reg_name='test', ca
         title='Assignment parameters predictor',
         loc='lower left', title_fontsize = 13
     )
+    plt.gca().add_artist(legend2)
+    legend3 = None
+    if add_handles:
+        legend3 = plt.legend(
+            handles=add_handles,
+            labels=add_labels,
+            framealpha=1,
+            fontsize=11,
+            bbox_to_anchor=(1.01, 0.08),
+            loc='lower left',
+            ncols=2,
+            title='Prospective assignment',
+            title_fontsize=13
+        )
+        plt.gca().add_artist(legend3)
+
     plt.gca().xaxis.set_major_formatter(ScalarFormatter(useMathText=True))
     plt.gca().xaxis.get_major_formatter().set_scientific(True)
     plt.gca().xaxis.get_major_formatter().set_powerlimits((-1, 1))
     plt.xlabel(r'$\beta_1$ : Impact of distance on logistic score', fontsize=14)
     plt.ylabel(r'$\beta_2$ : Impact of log(capacity) on logistic score', fontsize=14)
-    plt.xlim((-7e-3, 4e-3))
+    plt.xlim((-6e-3, 2.5e-3))
     plt.ylim((-2, 3))
-    plt.savefig('figures//estimators_figures//visu_regressor_' + reg_name + '.pdf', bbox_inches="tight", format='pdf')
+
+    # Collecte toutes les légendes pour les inclure dans la sauvegarde
+    extra_artists = [legend1, legend2]
+    if legend3 is not None:
+        extra_artists.append(legend3)
+
+    plt.savefig(
+        'figures//estimators_figures//visu_regressor_' + reg_name + '.pdf',
+        format='pdf',
+        bbox_inches='tight',
+        bbox_extra_artists=extra_artists
+    )
     plt.show()
 
 def assign_coeffs_pred(alphas_coeff, betas_coeff,seats_ac, range_ac):

@@ -435,14 +435,14 @@ def visu_deliveries_array(deliveries, obs_sizes, obs_names, period_duration, n_m
             ax.fill_between(x, bottom, top, label=obs_names[i] +' '+ str(int((deliveries[:, i].sum())/10**(exp_leg-1)+0.5)/10) + 'e'+str(exp_leg)+ ' seats',
                             color=color_mix[i - n_market], linewidth=0, edgecolor='0.2', alpha=1, hatch='..', zorder=2)
             bottom = top
-    ax.fill_between(x, bottom, top, alpha=0.8, color='grey', linewidth=0, edgecolor='white', label='Others', hatch='//',
-                    zorder=2)
+    # ax.fill_between(x, bottom, top, alpha=0.8, color='grey', linewidth=0, edgecolor='white', label='Others', hatch='//',
+    #                 zorder=2)
     ax.legend(framealpha=1, bbox_to_anchor=(1.05, 1),
-              loc='upper left', borderaxespad=0., ncol=2)
+              loc='upper left', borderaxespad=0., ncol=1)
     plt.xlim(x.min(), x.max())
     plt.ylim(0, 1.05 * top.max())
-    plt.xlabel('Years')
-    plt.ylabel('Produced aircraft seats')
+    plt.xlabel('Years', fontsize=13)
+    plt.ylabel('Produced aircraft seats', fontsize=13)
     plt.tight_layout()
     plt.savefig('figures/integrated_observation/scenario/' + graph_name + '_prod_mod.pdf')
     plt.show()
@@ -617,14 +617,16 @@ def constraint_plot(traff_array, active_fleet_array, ranges_c, title ='test', ye
              marker = 'x', linewidth=1.5,ms = 6, mew = 1.5)
     plt.plot(years_array, np.array(range_volume)-np.array(distance_volume), label = r'Difference $\rightarrow$ Range margin', color = 'blue',
              linewidth=2, marker = 'x', ms = 8, mew = 2)
-    plt.axvspan(
-        2020-0.5,
-        2024-0.5,
-        color='#EB8A90',
-        alpha=0.85,
-        zorder=3
-    )
-    plt.text(2019.5, 6500, 'COVID', color='white', fontsize=15)
+    print((np.array(range_volume)-np.array(distance_volume))[0], (np.array(range_volume) - np.array(distance_volume))[-1])
+    if years[0]<2024:
+        plt.axvspan(
+            2020-0.5,
+            2024-0.5,
+            color='#EB8A90',
+            alpha=0.85,
+            zorder=3
+        )
+        plt.text(2019.5, 6500, 'COVID', color='white', fontsize=15)
 
     y_min= int(min(min(np.array(distance_volume)),min(np.array(range_volume)),min(np.array(range_volume)-np.array(distance_volume)))/1000)*1000
     y_max = (int(max(max(np.array(distance_volume)), max(np.array(range_volume)),
@@ -765,7 +767,7 @@ def historic_retirement_age(fleet_db, y_min=2000, y_max=2024):
     return None
 
 
-def visu_fleet_array(vol_obs, obs_names, obs_name, color_mix=colors_26):
+def visu_fleet_array(vol_obs, obs_names, obs_name, color_mix=colors_26, title='fleet_ev_test'):
     """Stacked-area evolution of a per-type 2D volume array (T, M)."""
     totals = vol_obs.sum(axis=0)
     top_k = min(48, vol_obs.shape[1])
@@ -793,7 +795,7 @@ def visu_fleet_array(vol_obs, obs_names, obs_name, color_mix=colors_26):
     x = np.arange(n_bars) + 2025
     bottom = np.zeros(n_bars)
     top = np.zeros(n_bars)
-    fig, ax = plt.subplots(figsize=(10, 6))
+    fig, ax = plt.subplots(figsize=(10, 4.5))
     plt.grid(axis="y", color="grey", linestyle="--")
 
     for i in range(p_categories):
@@ -836,24 +838,25 @@ def visu_fleet_array(vol_obs, obs_names, obs_name, color_mix=colors_26):
     )
     ax.legend(
         framealpha=1,
-        bbox_to_anchor=(1.05, 1),
+        bbox_to_anchor=(1.02, 1),
         loc="upper left",
         borderaxespad=0.0,
-        ncol=2,
+        ncol=3,
     )
 
     plt.xlim(x.min(), x.max())
     plt.ylim(0, 1.1 * top.max())
-    plt.xlabel("Years")
-    plt.ylabel(obs_name)
+    plt.xlabel("Years", fontsize = 13)
+    plt.ylabel(obs_name, fontsize = 13)
     plt.tight_layout()
+    plt.savefig('figures/integrated_observation/scenario/'+title+'.pdf')
     plt.show()
     return None
 
-def visu_retirement_age(vol_obs, obs_names, color_mix=colors_26):
+def visu_retirement_age(vol_obs, obs_names, color_mix=colors_26, title = 'test',y_ref=2026):
     """Average retirement age (and operating age) per type from a 3D array (T, A, M)."""
-    totals = vol_obs.sum(axis=(0, 1))
-    top_k = min(48, vol_obs.shape[2])
+    totals = np.max(vol_obs.sum(axis=1), axis = 0)-vol_obs.sum(1)[-1]
+    top_k = min(25, vol_obs.shape[2])
     top_indices = np.argsort(-totals)[:top_k]
 
     t = np.arange(vol_obs.shape[0])
@@ -882,7 +885,7 @@ def visu_retirement_age(vol_obs, obs_names, color_mix=colors_26):
     n_years = (retirements_seats_volumes_ini * ages_t_y[:, :, None]).sum(axis=1)
     volumes = retirements_seats_volumes_ini.sum(axis=1)
 
-    x = t[:-1] + 2026
+    x = t[:-1] + y_ref
     fig, ax = plt.subplots(figsize=(10, 5.5))
     ax.grid(axis="y", color="grey", linestyle="--")
     for ac in range(len(obs_names)):
@@ -900,8 +903,8 @@ def visu_retirement_age(vol_obs, obs_names, color_mix=colors_26):
         y[~mask] = np.nan
         if not np.any(mask):
             continue
-        if ac < 23:
-            ax.plot(x, y, "-", color=color_mix[ac], markersize=2, label=obs_names[ac], linewidth=1)
+        if ac < 20:
+            ax.plot(x, y, "-", color=color_mix[ac], markersize=2, label=obs_names[ac], linewidth=1.5)
         else:
             ax.plot(
                 x,
@@ -921,25 +924,26 @@ def visu_retirement_age(vol_obs, obs_names, color_mix=colors_26):
         np.isfinite(x) & np.isfinite(y_agg) & (retirements_seats_volumes_ini.sum(axis=(1, 2)) > 500)
     )
     y_agg[~mask] = np.nan
-    ax.plot(x, y_agg, "*-", color="black", markersize=5, label="avg ret age", linewidth=2)
+    ax.plot(x, y_agg, "x-", color="black", markersize=10, label="avg ret age", linewidth=3)
 
     operating_years = (vol_obs[:-1, :, :] * ages_t_y[:, :, None]).sum(axis=(1, 2))
     operating_volumes = vol_obs[:-1, :, :].sum(axis=(1, 2))
     ax.plot(
         x,
         operating_years / operating_volumes,
-        "*-",
+        "x-",
         color=(1, 0, 1),
-        markersize=5,
+        markersize=10,
         label="avg op age",
-        linewidth=2,
+        linewidth=3,
     )
 
-    plt.xlim(xmin=2026, xmax=2026 + vol_obs.shape[0]-2)
+    plt.xlim(xmin=y_ref, xmax=y_ref + vol_obs.shape[0]-2)
     plt.ylim((0,40))
     plt.xlabel("Years")
     plt.ylabel("Average retirement age")
-    plt.legend(ncol=2, title="Retirements volumes > 500 seats per year", bbox_to_anchor=(1.05, 1))
+    plt.legend(ncol=1, title="Retirements volumes \n > 500 seats per year", bbox_to_anchor=(1.01, 1.03))
     plt.tight_layout()
+    plt.savefig('figures/integrated_observation/scenario/retirement_age_'+title+'.pdf')
     plt.show()
     return None
