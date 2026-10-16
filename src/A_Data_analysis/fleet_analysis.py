@@ -594,7 +594,7 @@ def constraint_plot(traff_array, active_fleet_array, ranges_c, title ='test', ye
     ax.set_xticks([0, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000, 12000, 14000, 16000, 18000],
                   ['0', '1k', '2k', '3k', '4k', '5k', '6k', '7k', '8k', '9k', '10k', '12k', '14k', '16k', '18k'])
     ax.set_xlabel('Connection distance /Max. Range (km)', fontsize = 13)
-    ax.set_ylabel('Share of the total '+label+'s', fontsize = 13)
+    ax.set_ylabel('Share of the total '+label, fontsize = 13)
     ax.plot([0,0],[0,0], label = 'Fleet constraints', linestyle = '-', color = 'black', linewidth=1)
     ax.plot([0,0],[0,0], label = 'Network requirements', linestyle = '--', color = 'black', linewidth=1)
     plt.legend(loc='upper right', framealpha=1, fontsize = 13)
@@ -607,7 +607,11 @@ def constraint_plot(traff_array, active_fleet_array, ranges_c, title ='test', ye
 
     cbar = plt.colorbar(sm, ax=ax)
     cbar.set_label('Year', fontsize = 13)
-    plt.savefig('figures/integrated_observation/scenario/range_constraints/constraint_plot_'+title+obs_choice+'.'+format, bbox_inches="tight", format=format)
+    if format == 'png':
+        plt.savefig('figures/integrated_observation/scenario/range_constraints/constraint_plot_'+title+obs_choice+'.'+format, bbox_inches="tight", format=format, dpi=200)
+    else:
+        plt.savefig('figures/integrated_observation/scenario/range_constraints/constraint_plot_'+title+obs_choice+'.'+format, bbox_inches="tight", format=format)
+
     plt.show()
     plt.figure(figsize=(8, 5))
 
