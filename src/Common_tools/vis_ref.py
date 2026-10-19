@@ -183,17 +183,17 @@ def date_to_float_year(date):
 
 def I1(gamma, m):
     """∫₀ᵐ t(m-t) exp(γt) dt"""
-    val, _ = integrate.quad(lambda t: t * (m - t) * np.exp(gamma * t), 0, m)
+    val, _ = integrate.quad(lambda t: t**0.6 * (m - t)**0.6 * np.exp(gamma * t), 0, m)
     return val
 
 def I_d(gamma, m, a, b):
     """∫₀ᵐ t(m-t) exp(γt) dt"""
-    val, _ = integrate.quad(lambda t: t * (m - t) * np.exp(gamma * t), a, b)
+    val, _ = integrate.quad(lambda t: t**0.6 * (m - t)**0.6 * np.exp(gamma * t), a, b)
     return val
 
 def I2(gamma, m):
     """∫₀ᵐ t²(m-t) exp(γt) dt"""
-    val, _ = integrate.quad(lambda t: t**2 * (m - t) * np.exp(gamma * t), 0, m)
+    val, _ = integrate.quad(lambda t: t**1.6 * (m - t)**0.6 * np.exp(gamma * t), 0, m)
     return val
 
 

@@ -161,7 +161,7 @@ def observe_scenario(alphas, betas,ranges, omegas, types_names, traffic_structur
                          capac_limits=(1.9e4, 6e6), frame_s=8, period_ref=0,period_duration=period_duration,
                          dic_fuel = dic_fuel, vals_fuel = vals_fuel, reso=reso,label_size_param = label_size_param)
         return None
-    elif observation not in ['Av_ac_seats', 'ASK', 'FB']:
+    elif observation not in ['Av_ac_seats', 'ASK', 'FB','N_flights', 'Seats']:
         print('observation not recognized.')
         print('observation must be in [Av_ac_seats, ASK, FB].or N_flights or Seats if the code is updated.')
         return None
@@ -245,7 +245,16 @@ def dynamic_pred_vis(traff_structures, alphas, betas, ranges, omegas, periods, o
     lists_r = []
     for period in periods:
         df_p =  create_df(traff_structures[period], alphas, betas, omegas[period], ranges, types_names)
-        if observation == 'ASK':
+        if observation == 'N_flights':
+            dict_sizes = dict(zip(types_names, list(obs_sizes)))
+            productivity_modelling.ASK_assignment(df_p, 'EC_preCOVID')
+            df_p['Seats_ac'] = df_p['Aircraft Type Name'].map(dict_sizes)
+            df_p['N_flights'] = df_p['ASK']/df_p['Seats_ac']/df_p['Distance_conn (km)']
+            df_p =  agg_ind_g(df_p, observation = observation)
+        if observation == 'Seats':
+            productivity_modelling.ASK_assignment(df_p, 'EC_preCOVID')
+            df_p['Seats'] = df_p['ASK']/df_p['Distance_conn (km)']
+        elif observation == 'ASK':
             productivity_modelling.ASK_assignment(df_p, 'EC_preCOVID')
             df_p =  agg_ind_g(df_p, observation = observation)
         elif observation == 'FB':
@@ -316,7 +325,7 @@ def dynamic_pred_vis(traff_structures, alphas, betas, ranges, omegas, periods, o
     n_bars = type_obs.shape[0]
     p_categories = type_obs.shape[1]
 
-    x = np.arange(n_bars) * period_duration + 2024
+    x = np.arange(n_bars) * period_duration + add_period
     bottom = np.zeros(n_bars)
     top = np.zeros(n_bars)
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -340,6 +349,10 @@ def dynamic_pred_vis(traff_structures, alphas, betas, ranges, omegas, periods, o
     plt.xlim(x.min(), x.max())
     plt.ylim(0, 1.1 * top.max())
     plt.xlabel('Years')
+    if observation == 'Av_ac_seats':
+        plt.ylabel('Aircraft acitvity')
+    if observation == 'N_flights':
+        plt.ylabel('Estimated number of flights')
     plt.ylabel('Quantity of ' + observation)
     plt.tight_layout()
     plt.savefig('figures/integrated_observation/scenario/' + video_name + '.pdf')

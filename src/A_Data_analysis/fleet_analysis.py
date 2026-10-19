@@ -598,7 +598,7 @@ def constraint_plot(traff_array, active_fleet_array, ranges_c, title ='test', ye
     ax.plot([0,0],[0,0], label = 'Fleet constraints', linestyle = '-', color = 'black', linewidth=1)
     ax.plot([0,0],[0,0], label = 'Network requirements', linestyle = '--', color = 'black', linewidth=1)
     plt.legend(loc='upper right', framealpha=1, fontsize = 13)
-    plt.xlim(0, 19000)
+    plt.xlim(0, 18000)
     plt.ylim(0, 1.05)
     ax.yaxis.set_major_formatter(mtick.PercentFormatter(xmax=1))
     ax.yaxis.set_major_locator(mtick.MultipleLocator(0.2))

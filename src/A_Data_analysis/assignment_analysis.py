@@ -136,7 +136,11 @@ def market_vis(df_o, name_fig ='test_market', title_fig = None,  color_mix = vis
     X = np.exp(x)
     Y = np.exp(y)
     if color_rank is None: #pas de pré ordonnancement des couleurs
-        color_rank = {ac: k for k, ac in enumerate(selec)}
+        if rank is not None:
+            # Utiliser les valeurs de rank pour déterminer les couleurs
+            color_rank = {ac: rank[name] for ac, name in zip(selec, selec_n) if name in rank}
+        else:
+            color_rank = {ac: k for k, ac in enumerate(selec)}
 
     #Calcul des distributions marginales de chaque marché
     input_ac_n = np.array(df[market])
@@ -336,7 +340,11 @@ def market_ranges_marginal(df, name_fig='test_market', title_fig=None, color_mix
     selec_n = selec_0[market+' Name'].to_numpy()
 
     if color_rank is None:
-        color_rank = {ac: k for k, ac in enumerate(selec)}
+        if rank is not None:
+            # Utiliser les valeurs de rank pour déterminer les couleurs
+            color_rank = {ac: rank[name] for ac, name in zip(selec, selec_n) if name in rank}
+        else:
+            color_rank = {ac: k for k, ac in enumerate(selec)}
 
     dimensions = (14, 10)
     width_main, width_grid = 17, 21
@@ -440,7 +448,11 @@ def market_ranges_marginal_cum(df, name_fig='test_market', title_fig=None, color
     selec_n = selec_1[market+' Name'].to_numpy()
 
     if color_rank is None:
-        color_rank = {ac: k for k, ac in enumerate(selec)}
+        if rank is not None:
+            # Utiliser les valeurs de rank pour déterminer les couleurs
+            color_rank = {ac: rank[name] for ac, name in zip(selec1, selec_n) if name in rank}
+        else:
+            color_rank = {ac: k for k, ac in enumerate(selec)}
 
     x = np.linspace(dist_limits[0], dist_limits[1], reso)
     total_observation = market_types[observation].sum()
