@@ -54,7 +54,7 @@ def activity_assignment(df, excel_title, corrective_factor = 1.0, d_seuil=6000, 
     return(None)
 
 
-def ASK_assignment(df, excel_title, corrective_factor = 1.0, d_seuil=6000, v_1=860, v_2=910,v_c = 350, supp_NB=0.3, supp_WB=0.4):
+def ASK_assignment(df, excel_title, corrective_factor = 1.0, d_seuil=6000, v_1=860, v_2=910,v_c = 350, supp_NB=0.3, supp_WB=0.4, corrective_ask = 1):
     stat_est = pd.read_excel('data/productivity_measures/GT_contr_estimates_' + excel_title + '.xlsx')
     stat_est['abscisse'] = np.log(stat_est['abscisse'])
 
@@ -77,6 +77,6 @@ def ASK_assignment(df, excel_title, corrective_factor = 1.0, d_seuil=6000, v_1=8
     vals = np.log(df['Estimated FT'].values + 0.3).flatten()
     gt_cont = linear_interp(vals)
     df['Seats'] = df['Av_ac_seats']/ ((df['Estimated FT'] + gt_cont+0.3) / (24 * 365.25))
-    df['ASK'] = df['Seats']*df['Distance_conn (km)']
+    df['ASK'] = corrective_ask*df['Seats']*df['Distance_conn (km)']
     return None
 

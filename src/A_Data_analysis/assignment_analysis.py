@@ -1355,3 +1355,158 @@ def inflation_evolution(traff_1, observation= 'ASK', dates_list=None, weight = T
     ax.legend(framealpha=1, loc='best', ncol=2, fontsize=11)
     plt.savefig('figures/assignment_figures/'+observation+'_weighted_size_indicators'+title+'.pdf',bbox_inches="tight")
     plt.show()
+
+
+def fuel_eff_vis(df, name_fig ='test_fuel_eff', vmax = None,dist_limits =(4e2, 1.9e4), capac_limits = (9e3, 4e6),
+                 reso=400, smooth_param = 0.05,  format_fig = 'pdf'):
+    # market_seg est une liste contenant tous les identifiants à étudier.
+    dimensions = (14, 10)
+    width_grid, height_grid = 21, 8
+    width_main, height_main = 17, 5
+
+    smooth_x = 2.7*(np.log(dist_limits[1]) - np.log(dist_limits[0])) * smooth_param / (
+            dimensions[0] * width_main / width_grid)
+    smooth_y = 2.7*(np.log(capac_limits[1]) - np.log(capac_limits[0])) * smooth_param / (
+            dimensions[
+                1] * height_main / height_grid) #seulement pour comier le lissage de la figure précédent, peut être un sujet à adapter
+    dimensions = (10, 6)
+    fig = plt.figure(figsize=dimensions)
+
+    # Calcul de la distribution globales
+
+    traff_matrix, x, y = vis_ref.smooth_ln_2d(np.array(df['Distance_conn (km)']),
+        np.array(df['Seats_conn_p']), np.array(df['ASK']),
+        dist_limits, capac_limits, reso, smooth_x, smooth_y)
+    traff_matrix = traff_matrix.transpose()
+
+    fb_matrix, x, y = vis_ref.smooth_ln_2d(np.array(df['Distance_conn (km)']),
+                                              np.array(df['Seats_conn_p']), np.array(df['FB']),
+                                              dist_limits, capac_limits, reso, smooth_x, smooth_y)
+    fb_matrix = fb_matrix.transpose()
+
+    X = np.exp(x)
+    Y = np.exp(y)
+    quanti = np.array([0.5, 0.8, 0.95, 0.99])
+    traf_quant, traf_cum, boundaries = vis_ref.quantile_classification(traff_matrix, quanti)
+
+
+    ratio = fb_matrix/traff_matrix*10**12
+    if vmax is None:
+        vmax = np.max(ratio[~np.isnan(ratio)])
+    l_cs = [15, 18, 20, 22, 25]
+    lw_cs = [1.2, 1.2, 1.2, 1.2, 1.2]
+    ls_cs = ['-', '-', '-', '-', '-']
+
+    levels = [0, 15, 18, 20, 22, 25, max(vmax,26)]
+    colors = ['green', 'limegreen', 'gold', 'orange', 'orangered', 'darkred']
+
+    plt.contourf(
+        X, Y, ratio,
+        levels=levels,
+        colors=colors,
+        alpha=1,
+        zorder=3
+    )
+
+    cs = plt.contour(
+        X, Y, ratio,
+        levels=l_cs,
+        colors='black',
+        linewidths=lw_cs,
+        linestyles=ls_cs,
+        zorder=4
+    )
+    legend_elements = [
+        Patch(facecolor=colors[0], label='< 15'),
+        Patch(facecolor=colors[1], label='15-18'),
+        Patch(facecolor=colors[2], label='18–20'),
+        Patch(facecolor=colors[3], label='20–22'),
+        Patch(facecolor=colors[4], label='22–25'),
+        Patch(facecolor=colors[5], label='> 25'),
+    ]
+
+    plt.legend(
+        handles=legend_elements,
+        title=r'Fuel efficiency (g-kerosene/$ASK_{eq})$',
+        fontsize=12,
+        title_fontsize=14,
+        bbox_to_anchor=(-0.09, 1.16),
+        ncol=6,
+        loc='upper left'
+    )
+
+    plt.contourf(X, Y, traf_cum, levels=[0.5, 1],
+                 colors='white', aspect='auto', zorder=3, alpha=0.1)
+    plt.contourf(X, Y, traf_cum, levels=[0.8, 1],
+                 colors='white', aspect='auto', zorder=3, alpha=0.3)
+    plt.contourf(X, Y, traf_cum, levels=[0.95, 1],
+                 colors='white', aspect='auto', zorder=3, alpha=0.4)
+    plt.contourf(X, Y, traf_cum, levels=[0.99, 1],
+                 colors='white', aspect='auto', zorder=5, alpha=1)
+
+    L_boundaries = [[dist_limits[0],dist_limits[1]], [capac_limits[0],capac_limits[1]]]
+    results = []
+    L_deb = [5,2]
+    L_fin = [1,2,5]
+    for lims in L_boundaries:
+        deb = np.exp(np.log(lims[0])-np.log(10)*int(np.log10(lims[0])))
+        if deb > 5 :
+            ind_1 = 0
+        elif deb > 2 :
+            ind_1 = 1
+        else :
+            ind_1 = 2
+        fin = np.exp(np.log(lims[1]/5)-np.log(10)*int(np.log10(lims[1]/5)))
+        if fin < 2:
+            ind_2 = 0
+        elif fin < 4 :
+            ind_2 = 1
+        else :
+            ind_2 = 2
+        expo =  int(np.log10(lims[0]))+1
+        delta_e = int(np.log10(lims[1]/5))- int(np.log10(lims[0]))
+        results.append([ind_1, ind_2, expo, delta_e])
+    for i in range(results[0][0]):
+        val = L_deb[i]*10**(results[0][2]-1)
+        plt.plot([val, val], [capac_limits[0],capac_limits[1]], color='black', linestyle='--', linewidth=0.3, alpha=0.5, zorder = 5)
+    for j in range(results[0][3]):
+        for u in L_fin :
+            val = u * 10**(results[0][2] + j)
+            plt.plot([val, val], [capac_limits[0],capac_limits[1]], color='black', linestyle='--', linewidth=0.3, alpha=0.5, zorder = 5)
+    for i in range(results[0][1]):
+        val = L_fin[i] * 10 ** (results[0][2] +results[0][3])
+        plt.plot([val, val], [capac_limits[0], capac_limits[1]], color='black', linestyle='--', linewidth=0.3, zorder = 5,
+                 alpha=0.5)
+    for i in range(results[1][0]):
+        val = L_deb[i]*10**(results[1][2]-1)
+        plt.plot([dist_limits[0],dist_limits[1]], [val, val], color='black', linestyle='--', linewidth=0.3, alpha=0.5, zorder = 5)
+    for j in range(results[1][3]):
+        for u in L_fin :
+            val = u * 10**(results[1][2] + j)
+            plt.plot([dist_limits[0],dist_limits[1]],[val, val], color='black', linestyle='--', linewidth=0.3, alpha=0.5, zorder = 5)
+    for i in range(results[1][1]):
+        val = L_fin[i] * 10 ** (results[1][2] +results[1][3])
+        plt.plot([dist_limits[0], dist_limits[1]],[val, val], color='black', linestyle='--', linewidth=0.3, zorder = 5,
+                 alpha=0.5)
+    plt.xlim(dist_limits[0], dist_limits[1])
+    plt.ylim(capac_limits[0], capac_limits[1])
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.xlabel('Route distance (km)', fontsize=18, color='darkblue')
+    plt.xticks(fontsize=16)
+    plt.yticks(fontsize=16)
+    plt.ylabel('Route traffic intensity (seats/year)', fontsize=18, color='darkred')
+    plt.gca().xaxis.set_major_locator(mticker.LogLocator(base=10, subs=(1, 2, 5)))
+    plt.gca().xaxis.set_minor_locator(mticker.LogLocator(base=10, subs=(3, 4, 6, 7, 8, 9)))
+    plt.gca().yaxis.set_major_locator(mticker.LogLocator(base=10, subs=(1, 2, 5)))
+    plt.gca().yaxis.set_minor_locator(mticker.LogLocator(base=10, subs=(3, 4, 6, 7, 8, 9)))
+    # Formatter commun aux majeurs et mineurs
+    formatter = mticker.FuncFormatter(vis_ref.log_125_formatter)
+    plt.gca().xaxis.set_major_formatter(formatter)
+    plt.gca().xaxis.set_minor_formatter(formatter)
+    plt.gca().yaxis.set_major_formatter(formatter)
+    plt.gca().yaxis.set_minor_formatter(formatter)
+
+    plt.savefig('figures/assignment_figures/' + name_fig +'.'+ format_fig)
+    plt.close()
+    return None

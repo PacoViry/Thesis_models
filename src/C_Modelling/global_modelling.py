@@ -2,12 +2,12 @@ import numpy as np
 import pandas as pd
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-# import time as tm
 import os
 from PIL import Image
 import glob
 import imageio.v2 as imageio
 import importlib
+
 from src.C_Modelling import fleet_content_modelling
 from src.C_Modelling import assignment_conv
 from src.C_Modelling import productivity_modelling
@@ -18,19 +18,19 @@ from src.Common_tools import vis_ref
 
 
 importlib.reload(fleet_content_modelling)
-# importlib.reload(assignment_analysis)
-# importlib.reload(productivity_modelling)
+importlib.reload(assignment_analysis)
+importlib.reload(productivity_modelling)
 importlib.reload(assignment_conv)
 
 
-def fuel_calculations(df, seats_c, dic_fuel, fb_vals, n_flights = True): #gives Seymmour estimation of the fuel consumption in kg (maybe a corrective factor to include for gcd vs real distance)
+def fuel_calculations(df, seats_c, dic_fuel, fb_vals, n_flights = True): #gives Seymmour estimation of the fuel consumption in Mt (maybe a corrective factor to include for gcd vs real distance)
     indices_s = df['Aircraft Type Name'].map(dic_fuel)
     if n_flights :
         df['N_flights'] = df['Seats']/ np.array(seats_c)[df['Aircraft Type']]
     distances = df['Distance_conn (km)'].values
     coeffs = fb_vals[indices_s]
-    fb = coeffs[:, 0] * distances ** 2 + coeffs[:, 1] * distances + coeffs[:, 2]
-    df['FB'] = fb*df['N_flights']
+    fb = (coeffs[:, 0] * distances ** 2 + coeffs[:, 1] * distances + coeffs[:, 2])
+    df['FB'] = fb*df['N_flights']/10**9
     return None
 
 def compute_fleet_composition(initial_fleet, deliveries, obs_sizes, traffic_q,
@@ -87,7 +87,6 @@ def compute_fleet_assignment(vol_act, traffic_structures,
     n_y = vol_act.shape[0]
     omegas_t = omegas_0.copy()
     omegas_l = []
-
     print(f'Computing fleet assignment, {n_y} periods:', end=' ')
     for t in range(n_y):
         print(f'{int(1000*t/n_y+0.5)/10}%', end=' ')
@@ -119,7 +118,6 @@ def compute_fleet_assignment(vol_act, traffic_structures,
 
         fleet_obs_const_t = fleet_obs_const_test.copy()
         non_zero_indices = np.nonzero(existence_cache)[0]
-
         omegas_t = assignment_conv.conv_assignt(
             traffic_structures[t, :, :], existence_cache,
             alphas, betas, omegas_t, ranges,
@@ -135,7 +133,8 @@ def compute_fleet_assignment(vol_act, traffic_structures,
 
 
 def observe_scenario(alphas, betas,ranges, omegas, types_names, traffic_structures, period_duration=1, observation = 'Av_ac_seats',
-                     obs_sizes = None, dic_fuel = None, vals_fuel = None,period_ref = None,add_period = 0, save_name = 'scenario_test', smooth_param = 0.05, reso=400,label_size_param = 1):
+                     obs_sizes = None, dic_fuel = None, vals_fuel = None,period_ref = None,add_period = 0, save_name = 'scenario_test', smooth_param = 0.05,
+                     reso=400,label_size_param = 1, distance_correction_factor = 1):
     if period_ref is None :
         period_ref = omegas.shape[0] - 1
     if observation is None :
@@ -145,21 +144,24 @@ def observe_scenario(alphas, betas,ranges, omegas, types_names, traffic_structur
                          video_name=save_name+'_Av_ac_seats', format_v='video', color_mix=vis_ref.colors_26,
                          market='Aircraft Type', observation='Av_ac_seats', dist_limits=(4e2, 1.9e4),
                          capac_limits=(9e3, 4e6),period_duration=period_duration,smooth_param=smooth_param,
-                         frame_s=8, period_ref=period_ref, reso=reso,label_size_param = label_size_param)
+                         frame_s=8, period_ref=period_ref, reso=reso,label_size_param = label_size_param,
+                         distance_correction_factor=distance_correction_factor)
         print('ASK')
         dynamic_pred_vis(traffic_structures, alphas, betas, ranges, omegas, list(range(omegas.shape[0])),
                          add_period=add_period, types_names=types_names, obs_sizes=obs_sizes,
                          video_name='test_sc_obs_market'+'_ASK', format_v='video', color_mix=vis_ref.colors_26,
                          market='Aircraft Type', observation='ASK', dist_limits=(4.9e2, 1.9e4),
                          capac_limits=(1.9e4, 6e6),period_duration=period_duration,smooth_param=smooth_param,
-                         frame_s=8, period_ref=period_ref, reso=reso,label_size_param = label_size_param)
+                         frame_s=8, period_ref=period_ref, reso=reso,label_size_param = label_size_param,
+                         distance_correction_factor=distance_correction_factor)
         print('FB')
         dynamic_pred_vis(traffic_structures, alphas, betas, ranges, omegas, list(range(omegas.shape[0])),
                          add_period=add_period, types_names=types_names,obs_sizes=obs_sizes,
                          video_name='test_sc_obs_market'+'_FB', format_v='video', color_mix=vis_ref.colors_26,
                          market='Aircraft Type', observation='FB', dist_limits=(4.9e2, 1.9e4),smooth_param=smooth_param,
                          capac_limits=(1.9e4, 6e6), frame_s=8, period_ref=0,period_duration=period_duration,
-                         dic_fuel = dic_fuel, vals_fuel = vals_fuel, reso=reso,label_size_param = label_size_param)
+                         dic_fuel = dic_fuel, vals_fuel = vals_fuel, reso=reso,label_size_param = label_size_param,
+                         distance_correction_factor=distance_correction_factor)
         return None
     elif observation not in ['Av_ac_seats', 'ASK', 'FB','N_flights', 'Seats']:
         print('observation not recognized.')
@@ -170,7 +172,8 @@ def observe_scenario(alphas, betas,ranges, omegas, types_names, traffic_structur
                          video_name=save_name+'_'+observation, format_v='video', color_mix=vis_ref.colors_26,
                          market='Aircraft Type', observation=observation, dist_limits=(4.9e2, 1.9e4),smooth_param=smooth_param,
                          capac_limits=(1.9e4, 6e6), frame_s=4, period_ref=period_ref,period_duration=period_duration,
-                         dic_fuel = dic_fuel, vals_fuel = vals_fuel, reso=reso,label_size_param = label_size_param)
+                         dic_fuel = dic_fuel, vals_fuel = vals_fuel, reso=reso,label_size_param = label_size_param,
+                         distance_correction_factor=distance_correction_factor)
     return None
 
 def create_df(traff, alphas,betas, omegas_p, ranges,types_names, observation ='Av_ac_seats'):
@@ -222,7 +225,8 @@ def dynamic_pred_vis(traff_structures, alphas, betas, ranges, omegas, periods, o
                      video_name = 'test_video_market', format_v = 'gif', color_mix = vis_ref.colors_26,
                      market = 'Aircraft Type',observation = 'Av_ac_seats', dist_limits = (4e2, 1.9e4), capac_limits = (9e3, 5e6),
                      frame_s = 2, period_ref = None, n_market = 33,reso = 400, smooth_param = 0.05,
-                     period_duration = 1,label_size_param = 1,dic_fuel = None, vals_fuel = None):
+                     period_duration = 1,label_size_param = 1,dic_fuel = None, vals_fuel = None,
+                         distance_correction_factor=1):
     name_periods = periods
     if types_names is None:
        types_names = list(range(omegas.shape[2]))
@@ -247,18 +251,18 @@ def dynamic_pred_vis(traff_structures, alphas, betas, ranges, omegas, periods, o
         df_p =  create_df(traff_structures[period], alphas, betas, omegas[period], ranges, types_names)
         if observation == 'N_flights':
             dict_sizes = dict(zip(types_names, list(obs_sizes)))
-            productivity_modelling.ASK_assignment(df_p, 'EC_preCOVID')
+            productivity_modelling.ASK_assignment(df_p, 'EC_preCOVID', corrective_ask =distance_correction_factor)
             df_p['Seats_ac'] = df_p['Aircraft Type Name'].map(dict_sizes)
             df_p['N_flights'] = df_p['ASK']/df_p['Seats_ac']/df_p['Distance_conn (km)']
             df_p =  agg_ind_g(df_p, observation = observation)
-        if observation == 'Seats':
-            productivity_modelling.ASK_assignment(df_p, 'EC_preCOVID')
+        elif observation == 'Seats':
+            productivity_modelling.ASK_assignment(df_p, 'EC_preCOVID', corrective_ask = distance_correction_factor)
             df_p['Seats'] = df_p['ASK']/df_p['Distance_conn (km)']
         elif observation == 'ASK':
-            productivity_modelling.ASK_assignment(df_p, 'EC_preCOVID')
+            productivity_modelling.ASK_assignment(df_p, 'EC_preCOVID', corrective_ask = distance_correction_factor)
             df_p =  agg_ind_g(df_p, observation = observation)
         elif observation == 'FB':
-            productivity_modelling.ASK_assignment(df_p, 'EC_preCOVID')
+            productivity_modelling.ASK_assignment(df_p, 'EC_preCOVID', corrective_ask = distance_correction_factor)
             fuel_calculations(df_p, obs_sizes, dic_fuel, vals_fuel)
             df_p =  agg_ind_g(df_p, observation = observation)
         volumes = (
@@ -328,7 +332,7 @@ def dynamic_pred_vis(traff_structures, alphas, betas, ranges, omegas, periods, o
     x = np.arange(n_bars) * period_duration + add_period
     bottom = np.zeros(n_bars)
     top = np.zeros(n_bars)
-    fig, ax = plt.subplots(figsize=(10, 6))
+    fig, ax = plt.subplots(figsize=(10, 5))
     plt.grid(axis='y', color='grey', linestyle='--')
 
     for i in range(p_categories):
@@ -344,16 +348,19 @@ def dynamic_pred_vis(traff_structures, alphas, betas, ranges, omegas, periods, o
     mpl.rcParams['hatch.color'] = 'white'
     ax.fill_between(x, bottom, top, alpha=0.9, color='grey', linewidth=0, edgecolor='white', label='Others', hatch='//')
     ax.legend(framealpha=1, bbox_to_anchor=(1.05, 1),
-              loc='upper left', borderaxespad=0., ncol=2)
+              loc='upper left', borderaxespad=0., ncol=3)
 
     plt.xlim(x.min(), x.max())
     plt.ylim(0, 1.1 * top.max())
-    plt.xlabel('Years')
+    plt.xlabel('Years', fontsize = 13)
     if observation == 'Av_ac_seats':
-        plt.ylabel('Aircraft acitvity')
-    if observation == 'N_flights':
-        plt.ylabel('Estimated number of flights')
-    plt.ylabel('Quantity of ' + observation)
+        plt.ylabel('Aircraft activity', fontsize = 13)
+    elif observation == 'N_flights':
+        plt.ylabel('Estimated number of flights', fontsize = 13)
+    elif observation == 'FB':
+        plt.ylabel('Fuel consumption (Mt)', fontsize = 13)
+    else:
+        plt.ylabel('Quantity of ' + observation, fontsize = 13)
     plt.tight_layout()
     plt.savefig('figures/integrated_observation/scenario/' + video_name + '.pdf')
     plt.show()
@@ -392,13 +399,22 @@ def dynamic_pred_vis(traff_structures, alphas, betas, ranges, omegas, periods, o
         if i%3 == 0 :
             print(str(int(1000*i/len(periods)+0.5)/10)+'%', end =' ')
         df_p = create_df(traff_structures[periods[i]], alphas, betas, omegas[periods[i]], ranges, types_names)
-        if observation == 'ASK':
-            productivity_modelling.ASK_assignment(df_p, 'EC_preCOVID')
-            df_p = agg_ind_g(df_p, observation='ASK')
+        if observation == 'N_flights':
+            dict_sizes = dict(zip(types_names, list(obs_sizes)))
+            productivity_modelling.ASK_assignment(df_p, 'EC_preCOVID', corrective_ask=distance_correction_factor)
+            df_p['Seats_ac'] = df_p['Aircraft Type Name'].map(dict_sizes)
+            df_p['N_flights'] = df_p['ASK'] / df_p['Seats_ac'] / df_p['Distance_conn (km)']
+            df_p = agg_ind_g(df_p, observation=observation)
         elif observation == 'FB':
-            productivity_modelling.ASK_assignment(df_p, 'EC_preCOVID')
+            productivity_modelling.ASK_assignment(df_p, 'EC_preCOVID', corrective_ask = distance_correction_factor)
             fuel_calculations(df_p, obs_sizes, dic_fuel, vals_fuel)
             df_p = agg_ind_g(df_p, observation='FB')
+        elif observation == 'Seats':
+            productivity_modelling.ASK_assignment(df_p, 'EC_preCOVID', corrective_ask = distance_correction_factor)
+            df_p['Seats'] = df_p['ASK']/df_p['Distance_conn (km)']
+        elif observation == 'ASK':
+            productivity_modelling.ASK_assignment(df_p, 'EC_preCOVID', corrective_ask = distance_correction_factor)
+            df_p =  agg_ind_g(df_p, observation = observation)
         assignment_analysis.market_vis(df_p,name_fig ='video_'+str(100+i), color_mix = color_mix, rank = rank, color_rank = sol,
                    market = market, observation = observation, dist_limits = dist_limits, capac_limits = capac_limits, n_market = n_market,
                    m_x_ref= traff_x_max, m_y_ref = traff_y_max, ask_d_ref = ask_max, video = True, title_fig = name_periods[i]+add_period,

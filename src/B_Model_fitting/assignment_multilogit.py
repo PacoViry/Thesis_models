@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+from numba import jit
 from scipy.stats import wasserstein_distance
 from scipy.optimize import minimize
 from matplotlib.ticker import ScalarFormatter
@@ -352,36 +353,93 @@ def correspondance_table(title_coeffs = 'logit_model_bts_35_5_1_9',title_tech = 
     # data_table[obs_choice + '_weight'] = data_table[obs_choice + '_weight'] / 10 ** p_min
     return data_table
 
-def predict_assignt(conn_data, existence_cache, alphas, betas, omegas, ranges, d_norm = 15000, cap_norm = 15, single_p = False):
-    if (d_norm == 1) and (cap_norm == 1):
+# def predict_assignt(conn_data, existence_cache, alphas, betas, omegas, ranges, d_norm = 15000, cap_norm = 15, single_p = False):
+#     if (d_norm == 1) and (cap_norm == 1):
+#         distance = conn_data[:, 1]
+#         capacity = np.log(conn_data[:, 2])
+#         ranges_b = ranges
+#     else :
+#         distance = conn_data[:, 1] / d_norm
+#         capacity = np.log(conn_data[:, 2]) / cap_norm
+#         ranges_b = ranges/d_norm
+#
+#     if single_p :
+#         us = alphas[:, None] * distance + betas[:, None] * capacity + omegas[
+#             :, 0][:, None]
+#         valid = (ranges_b[:, None] >= distance[None, :]) & (
+#             existence_cache[:, 0][:, None])
+#         us = np.where(valid, us, -np.inf)
+#     else :
+#         ids = conn_data[:, 0]
+#         if ids.dtype != int:
+#             ids = ids.astype(int)
+#         us = alphas[:, None] * distance + betas[:, None] * capacity + omegas[
+#             :, ids]
+#         valid = (ranges_b[:, None] >= distance[None, :]) & (
+#         existence_cache[:, ids])
+#         us = np.where(valid, us, -np.inf)
+#     us_max = np.max(us, axis=0, keepdims=True)
+#     exp_us = np.exp(us - us_max)
+#     denom = exp_us.sum(axis=0, keepdims=True)
+#     pots = exp_us / np.maximum(denom, 1e-12)
+#     return pots
+
+@jit(nopython=True, fastmath=True, cache=True)
+def predict_assignt_numba(distance, capacity, alphas, betas, omegas_col, ranges_b, existence_mask):
+    n_aircraft = alphas.shape[0]
+    n_connections = distance.shape[0]
+
+    us = np.empty((n_aircraft, n_connections), dtype=np.float64)
+
+    for i in range(n_aircraft):
+        for j in range(n_connections):
+            if ranges_b[i] >= distance[j] and existence_mask[i, j]:
+                us[i, j] = alphas[i] * distance[j] + betas[i] * capacity[j] + omegas_col[i, j]
+            else:
+                us[i, j] = -np.inf
+
+    pots = np.empty_like(us)
+    for j in range(n_connections):
+        max_val = -np.inf
+        for i in range(n_aircraft):
+            if us[i, j] > max_val:
+                max_val = us[i, j]
+
+        sum_exp = 0.0
+        for i in range(n_aircraft):
+            pots[i, j] = np.exp(us[i, j] - max_val)
+            sum_exp += pots[i, j]
+
+        sum_exp = max(sum_exp, 1e-12)
+        for i in range(n_aircraft):
+            pots[i, j] /= sum_exp
+
+    return pots
+
+
+def predict_assignt(conn_data, existence_cache, alphas, betas, omegas, ranges, d_norm=15000, cap_norm=15,
+                    single_p=False):
+    normalize = (d_norm != 1) or (cap_norm != 1)
+
+    if normalize:
+        distance = conn_data[:, 1] / d_norm
+        capacity = np.log(conn_data[:, 2]) / cap_norm
+        ranges_b = ranges / d_norm
+    else:
         distance = conn_data[:, 1]
         capacity = np.log(conn_data[:, 2])
         ranges_b = ranges
-    else :
-        distance = conn_data[:, 1] / d_norm
-        capacity = np.log(conn_data[:, 2]) / cap_norm
-        ranges_b = ranges/d_norm
 
-    if single_p :
-        us = alphas[:, None] * distance + betas[:, None] * capacity + omegas[
-            :, 0][:, None]
-        valid = (ranges_b[:, None] >= distance[None, :]) & (
-            existence_cache[:, 0][:, None])
-        us = np.where(valid, us, -np.inf)
-    else :
-        ids = conn_data[:, 0]
-        if ids.dtype != int:
-            ids = ids.astype(int)
-        us = alphas[:, None] * distance + betas[:, None] * capacity + omegas[
-            :, ids]
-        valid = (ranges_b[:, None] >= distance[None, :]) & (
-        existence_cache[:, ids])
-        us = np.where(valid, us, -np.inf)
-    us_max = np.max(us, axis=0, keepdims=True)
-    exp_us = np.exp(us - us_max)
-    denom = exp_us.sum(axis=0, keepdims=True)
-    pots = exp_us / np.maximum(denom, 1e-12)
-    return pots
+    if single_p:
+        omegas_col = np.tile(omegas[:, 0:1], (1, distance.shape[0]))
+        existence_mask = np.tile(existence_cache[:, 0:1], (1, distance.shape[0]))
+    else:
+        ids = conn_data[:, 0].astype(np.int32)
+        omegas_col = omegas[:, ids]
+        existence_mask = existence_cache[:, ids]
+
+    return predict_assignt_numba(distance, capacity, alphas, betas, omegas_col, ranges_b, existence_mask)
+
 
 def obs_comp(training_data, conn_data, pots, obs_norm,obs_norm2, save = False, title = None):
     e = 0
