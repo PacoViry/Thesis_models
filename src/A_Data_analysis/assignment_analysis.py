@@ -1427,7 +1427,7 @@ def fuel_eff_vis(df, name_fig ='test_fuel_eff', vmax = None,dist_limits =(4e2, 1
 
     plt.legend(
         handles=legend_elements,
-        title=r'Fuel efficiency (g-kerosene/$ASK_{eq})$',
+        title=r'Fuel intensity (g-kerosene/$ASK_{eq})$',
         fontsize=12,
         title_fontsize=14,
         bbox_to_anchor=(-0.09, 1.16),

@@ -81,14 +81,17 @@ def compute_fleet_composition(initial_fleet, deliveries, obs_sizes, traffic_q,
     return np.array(vol_obs), np.array(vol_act)
 
 def compute_fleet_assignment(vol_act, traffic_structures,
-                            alphas, betas, omegas_0, ranges,
+                            alphas, betas, omegas_0_l, ranges,repeat = False,
                             precision=1e-6):
 
     n_y = vol_act.shape[0]
-    omegas_t = omegas_0.copy()
+    if repeat == False:
+        omegas_t = omegas_0_l.copy()
     omegas_l = []
     print(f'Computing fleet assignment, {n_y} periods:', end=' ')
     for t in range(n_y):
+        if repeat == True:
+            omegas_t = omegas_0_l[t]
         print(f'{int(1000*t/n_y+0.5)/10}%', end=' ')
 
         fleet_obs_const_t = vol_act[t].sum(axis=0)
