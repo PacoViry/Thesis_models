@@ -243,7 +243,7 @@ def market_vis(df_o, name_fig ='test_market', title_fig = None,  color_mix = vis
             l if l.startswith("Others") else l.split(" ", 1)[1]
             for l in labels
         )
-        leg = x_density_ax.legend(handles, labels, loc='upper left', bbox_to_anchor=(0.97,1.05), ncols=int(n_market/25+1),
+        leg = x_density_ax.legend(handles, labels, loc='upper left', bbox_to_anchor=(0.97,1.05), ncols=int(n_market/20+1),
                                   fontsize=fontsize_legend,framealpha=1, edgecolor='none',labelspacing=0.4)
     else :
         handles, labels = x_density_ax.get_legend_handles_labels()
@@ -251,7 +251,7 @@ def market_vis(df_o, name_fig ='test_market', title_fig = None,  color_mix = vis
             l if l.startswith("Others") else l.split(" ", 1)[1]
             for l in labels
         )
-        leg = x_density_ax.legend(handles, labels, loc='upper left', bbox_to_anchor=(0.97,1.05), ncols=int(n_market/25+1),
+        leg = x_density_ax.legend(handles, labels, loc='upper left', bbox_to_anchor=(0.97,1.05), ncols=int(n_market/20+1),
                                   fontsize=fontsize_legend, framealpha=1, edgecolor='none',labelspacing=0.4)
     leg.set_zorder(5)
     if observation == 'Av_ac_seats':

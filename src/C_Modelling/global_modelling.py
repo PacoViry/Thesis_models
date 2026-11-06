@@ -60,7 +60,6 @@ def compute_fleet_composition(initial_fleet, deliveries, obs_sizes, traffic_q,
             fleet_pot_t * obs_sizes[None, :] * taux_utilisation_usuel *
             np.exp(aging_activity_coeff * (-y_s  - t * period_duration + age_array))[:, None]
         )
-
         fleet_obs_act_t, x_eq = fleet_content_modelling.fleet_content(
             0, x_eq, fleet_obs_t, retirement_propensions,
             tot_obs[t], epsilon=precision, first=True
