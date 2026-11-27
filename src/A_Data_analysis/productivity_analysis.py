@@ -552,10 +552,11 @@ def constru_flight_streak(df):
     n_tot = len(L_id)
     frac = n_tot//20
     series_tot = []
-
     for i in range(n_tot):
         if i % frac == 0: print(str(i//frac*5)+'%,', end = " ")
         aircraft_ref = grouped_aircrafts.get(L_id[i])
+        if aircraft_ref is None:
+            print(L_id[i])
         for t, aircraft_ex in aircraft_ref.groupby('Period'):
             if aircraft_ex.shape[0] > 10:
                 x_min, _ = visu_distrib(aircraft_ex, sigma = 0.8, visu = False,visu_c = False)
